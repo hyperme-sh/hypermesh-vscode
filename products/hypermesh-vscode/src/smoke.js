@@ -52,7 +52,6 @@ async function smokeChat({ apiBase, tenant, key, fetchImpl } = {}) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "X-Api-Key": apiKey,
       "X-Tenant-ID": tenantId,
       "Content-Type": "application/json",
     },

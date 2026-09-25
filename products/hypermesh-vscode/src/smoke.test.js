@@ -50,7 +50,7 @@ test("smoke posts one short completion and fails unless status is 200 with a bod
         const body = Buffer.concat(chunks).toString("utf8");
         assert.match(body, /ready/);
         assert.equal(req.headers.authorization, `Bearer ${KEY}`);
-        assert.equal(req.headers["x-api-key"], KEY);
+        assert.equal(req.headers["x-api-key"], undefined);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end('{"choices":[{"message":{"content":"ready"}}]}');
         return;
