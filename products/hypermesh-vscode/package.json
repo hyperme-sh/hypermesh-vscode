@@ -1,0 +1,41 @@
+{
+  "name": "hypermesh-vscode",
+  "displayName": "Hypermesh",
+  "description": "Hypermesh: smoke sends one short completion to the chat host.",
+  "version": "0.1.0",
+  "publisher": "fyberlabs",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "main": "./src/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "hypermesh.smoke",
+        "title": "Hypermesh: smoke"
+      }
+    ],
+    "configuration": {
+      "title": "Hypermesh",
+      "properties": {
+        "hypermesh.apiBase": {
+          "type": "string",
+          "default": "https://chat.test.hyperme.sh",
+          "description": "Chat host. Smoke posts /v1/chat/completions here. Not the control-plane stub.",
+          "scope": "window"
+        },
+        "hypermesh.tenant": {
+          "type": "string",
+          "default": "",
+          "description": "Tenant id sent as X-Tenant-ID.",
+          "scope": "window"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test src/smoke.test.js"
+  }
+}
