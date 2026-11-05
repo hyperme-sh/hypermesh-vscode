@@ -1,0 +1,48 @@
+{
+  "source_repository": "FyberLabs/panopticon",
+  "source_revision": "2d92d13f38d491c298631b9b9296979c1fbadd19",
+  "files": [
+    {
+      "source": "products/hypermesh-vscode/AGENTS.md",
+      "destination": "docs/source-AGENTS.md",
+      "sha256": "38ca762f0e70bb8ffc75ef9debc1461b83dce1f2592bc21e56a90dd24e33a926",
+      "unchanged": true
+    },
+    {
+      "source": "products/hypermesh-vscode/README.md",
+      "destination": "docs/source-README.md",
+      "sha256": "e6eacdfb3dcb7c4f20de4ad1a663a49338cedcb7fc6da25221ab0115726fc6c4",
+      "unchanged": true
+    },
+    {
+      "source": "products/hypermesh-vscode/edge-routes.json",
+      "destination": "edge-routes.json",
+      "sha256": "ef791150c6f963a42cf3090919af6938523388c2bdd33d8c4ebf660954b20e3d",
+      "unchanged": true
+    },
+    {
+      "source": "products/hypermesh-vscode/package.json",
+      "destination": "package.json",
+      "sha256": "a57bda6135a35162bea2cd2c28c32293f450bc05e5cafccf812adddef66f5781",
+      "unchanged": false
+    },
+    {
+      "source": "products/hypermesh-vscode/src/extension.js",
+      "destination": "src/extension.js",
+      "sha256": "ed852b6dbae94465614c87f37d5bb0641e4421a3981bf2306ecac515da511cf4",
+      "unchanged": true
+    },
+    {
+      "source": "products/hypermesh-vscode/src/smoke.js",
+      "destination": "src/smoke.js",
+      "sha256": "f3b2f775774c49ddebf637881c063c9e56bb99e53c5dec95e6cee32912a0a7d0",
+      "unchanged": true
+    },
+    {
+      "source": "products/hypermesh-vscode/src/smoke.test.js",
+      "destination": "src/smoke.test.js",
+      "sha256": "6af88ce8c88cd88daa841a35d3a23552bd5979522d65e258396f756b692aef8c",
+      "unchanged": true
+    }
+  ]
+}

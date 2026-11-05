@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "versions": {
-    "products/hypermesh-vscode/package.json": "0.1.0"
+    "package.json": "0.1.0"
   },
   "restorations": [],
   "owned_dependency_versions": {
