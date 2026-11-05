@@ -1,19 +1,38 @@
-# hypermesh-vscode
+# Hypermesh for VS Code
 
-Private component extraction from `FyberLabs/panopticon`.
+The **Hypermesh: smoke** command sends one short completion to the configured chat
+host. Configure `hypermesh.apiBase` (default `https://chat.test.hyperme.sh`) and
+`hypermesh.tenant`. The renter key is prompted once and stored in VS Code
+SecretStorage as `hypermesh.key`; it is not a workspace setting.
 
-Source commit: `2d92d13f38d491c298631b9b9296979c1fbadd19`.
+## Build and check
 
-Retained paths:
+Requires Node.js 24 and Python 3 for archive/provenance verification:
 
-- `products/hypermesh-vscode`
+```sh
+npm ci --ignore-scripts
+npm run check
+```
 
-The import retains selected-path Git history and verifies every retained blob and
-file mode against that exact source. Rename predecessor paths are not followed.
-Source paths stay in their original layout for review. See `EXTRACTION.json`.
+The check verifies retained source hashes, runs the existing seven headless tests,
+builds `dist/hypermesh-vscode.vsix`, verifies its file allowlist and runtime bytes,
+and runs those same tests against the unpacked VSIX outside the repository.
+Tests use a loopback HTTP server and fixture credentials. They never contact the
+configured test plane. An interactive VS Code extension-host test remains separate.
 
-This is a history import, not a standalone release or runtime cutover. Dependency
-closure, workspace/lock configuration, compatibility packages, contract snapshots,
-CI/runner eligibility and destination-specific credentials must be reviewed before
-adoption. Actions remain disabled. No credential, deployment ref or runtime is
-copied or switched; the original monorepo remains intact.
+The VSIX contains the extension manifest, README, Apache-2.0 license and two runtime JavaScript files.
+It excludes tests, developer tooling, provenance records and dependencies. The
+extension has no runtime npm dependencies. Packaging uses a locked local `vsce`;
+no marketplace publication or publisher credential is involved. The extension is licensed under Apache-2.0.
+
+## Phase C extraction
+
+`EXTRACTION.json` is the original history-import receipt. `SOURCE-MANIFEST.json`
+records relocation from Panopticon revision
+`2d92d13f38d491c298631b9b9296979c1fbadd19`. Runtime and original test bytes
+are unchanged, as are version 0.1.0, commands, settings and endpoint behavior.
+Historical source guidance is retained in `docs/`.
+
+CI uses debrunners while private and hosted Ubuntu when public, with read-only
+contents, pinned actions and no private credentials. The qualified VSIX is retained
+as an Actions artifact; no tag, release or Marketplace publication is performed.

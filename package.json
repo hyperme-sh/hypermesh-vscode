@@ -7,7 +7,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "main": "./src/extension.js",
   "activationEvents": [],
   "contributes": {
@@ -36,6 +38,17 @@
     }
   },
   "scripts": {
-    "test": "node --test src/smoke.test.js"
-  }
+    "test": "node --test src/smoke.test.js",
+    "package": "vsce package --no-dependencies --out dist/hypermesh-vscode.vsix",
+    "check": "bash scripts/check-package.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyperme-sh/hypermesh-vscode.git"
+  },
+  "private": true,
+  "devDependencies": {
+    "@vscode/vsce": "4.1.0"
+  },
+  "license": "Apache-2.0"
 }
