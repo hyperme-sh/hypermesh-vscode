@@ -5,17 +5,20 @@ const unavailable = () => new Error('Assigned Visor session unavailable; the req
 
 // Only an explicit user configuration selects the installed adapter and socket.
 // Prompt text stays on stdin; neither credentials nor project commands are used.
-async function chat({ executable, socket, cwd, prompt, signal, spawnProcess = spawn, timeout = 35000 }) {
+async function chat({ executable, socket, cwd, prompt, signal, spawnProcess = spawn, timeout = 365000 }) {
   if (![executable, socket, cwd].every(v => typeof v === 'string' && path.isAbsolute(v) && !/[\r\n\0]/.test(v)) ||
       typeof prompt !== 'string' || !prompt || Buffer.byteLength(prompt) > LIMIT || signal?.aborted) throw unavailable();
   const env = {};
   for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'HOME', 'USERPROFILE', 'LANG']) if (process.env[key]) env[key] = process.env[key];
   const child = spawnProcess(executable, ['--visor-socket', socket], { cwd, shell: false, windowsHide: true, env, stdio: ['pipe', 'pipe', 'pipe'] });
-  let pending, sequence = 0, session, output = '', buffer = Buffer.alloc(0), closed = false;
+  let pending, sequence = 0, session, output = '', buffer = Buffer.alloc(0), closed = false, cancelling = false, cancelTimer;
   const fail = () => { closed = true; if (pending) { const p = pending; pending = undefined; p.reject(unavailable()); } child.kill(); };
   const cancel = () => {
-    if (session && !closed) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: session } }) + '\n');
-    fail();
+    if (closed || cancelling) return;
+    if (!session || pending?.method !== 'session/prompt') return fail();
+    cancelling = true;
+    cancelTimer = setTimeout(fail, 1000);
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: session } }) + '\n');
   };
   const timer = setTimeout(cancel, timeout);
   signal?.addEventListener('abort', cancel, { once: true });
@@ -39,14 +42,14 @@ async function chat({ executable, socket, cwd, prompt, signal, spawnProcess = sp
         if (Buffer.byteLength(output) > LIMIT) return fail();
       } else if (pending && message.id === pending.id && !message.method) {
         const p = pending; pending = undefined;
-        if (message.error || !message.result) { p.reject(unavailable()); return fail(); }
+        if (cancelling || message.error || !message.result) { p.reject(unavailable()); return fail(); }
         p.resolve(message.result);
       } else return fail();
     }
   });
   const request = (method, params) => new Promise((resolve, reject) => {
-    if (closed || pending) return reject(unavailable());
-    const id = ++sequence; pending = { id, resolve, reject };
+    if (closed || cancelling || pending) return reject(unavailable());
+    const id = ++sequence; pending = { id, method, resolve, reject };
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
   try {
@@ -59,7 +62,7 @@ async function chat({ executable, socket, cwd, prompt, signal, spawnProcess = sp
     if (result.stopReason !== 'end_turn') throw unavailable();
     return output;
   } finally {
-    clearTimeout(timer); signal?.removeEventListener('abort', cancel);
+    clearTimeout(timer); clearTimeout(cancelTimer); signal?.removeEventListener('abort', cancel);
     closed = true; child.stdin.end(); child.kill();
   }
 }
