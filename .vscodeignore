@@ -4,3 +4,5 @@
 !src/extension.js
 !src/smoke.js
 !LICENSE
+!src/acp.js
+!src/editor.js

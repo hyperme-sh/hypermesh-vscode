@@ -1,7 +1,7 @@
 {
   "name": "hypermesh-vscode",
   "displayName": "Hypermesh",
-  "description": "Hypermesh: smoke sends one short completion to the chat host.",
+  "description": "Hypermesh assigned Visor chat and tool connections through Conductor.",
   "version": "0.1.0",
   "publisher": "fyberlabs",
   "engines": {
@@ -17,6 +17,18 @@
       {
         "command": "hypermesh.smoke",
         "title": "Hypermesh: smoke"
+      },
+      {
+        "command": "hypermesh.chat",
+        "title": "Hypermesh: Chat with Visor"
+      },
+      {
+        "command": "hypermesh.cancel",
+        "title": "Hypermesh: Cancel Visor turn"
+      },
+      {
+        "command": "hypermesh.attachTools",
+        "title": "Hypermesh: Manage Visor tool connections"
       }
     ],
     "configuration": {
@@ -33,12 +45,30 @@
           "default": "",
           "description": "Tenant id sent as X-Tenant-ID.",
           "scope": "window"
+        },
+        "hypermesh.acpExecutable": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute installed hypermesh-acp executable path. User settings only; never a project command.",
+          "scope": "machine"
+        },
+        "hypermesh.visorSocket": {
+          "type": "string",
+          "default": "",
+          "description": "Private Visor companion socket path. User settings only. No API key is sent.",
+          "scope": "machine"
+        },
+        "hypermesh.companionExecutable": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute installed hypermesh-companion executable path for reviewed tool connections.",
+          "scope": "machine"
         }
       }
     }
   },
   "scripts": {
-    "test": "node --test src/smoke.test.js",
+    "test": "node --test src/*.test.js",
     "package": "vsce package --no-dependencies --out dist/hypermesh-vscode.vsix",
     "check": "bash scripts/check-package.sh"
   },

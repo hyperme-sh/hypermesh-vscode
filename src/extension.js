@@ -2,6 +2,7 @@ const vscode = require("vscode");
 const { resolveKey, smokeChat } = require("./smoke");
 
 function activate(context) {
+  require("./editor").install(vscode, context);
   context.subscriptions.push(
     vscode.commands.registerCommand("hypermesh.smoke", async () => {
       const config = vscode.workspace.getConfiguration("hypermesh");
