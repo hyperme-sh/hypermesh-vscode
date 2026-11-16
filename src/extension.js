@@ -7,6 +7,7 @@ function activate(context) {
     vscode.commands.registerCommand("hypermesh.smoke", async () => {
       const config = vscode.workspace.getConfiguration("hypermesh");
       try {
+        const settings = require("./editor").smokeSettings(config);
         const key = await resolveKey(context.secrets, () =>
           vscode.window.showInputBox({
             prompt: "Renter API key",
@@ -15,8 +16,8 @@ function activate(context) {
           })
         );
         const result = await smokeChat({
-          apiBase: config.get("apiBase"),
-          tenant: config.get("tenant"),
+          ...settings,
+          fetchImpl: (url, options) => fetch(url, { ...options, redirect: "error" }),
           key,
         });
         vscode.window.showInformationMessage(`Hypermesh smoke ok (${result.status})`);

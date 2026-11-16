@@ -7,6 +7,12 @@ function userSetting(config, name) {
   // Repository/workspace settings never select an executable or credential peer.
   return entry?.globalValue ?? entry?.defaultValue ?? '';
 }
+function smokeSettings(config) {
+  const apiBase = userSetting(config, 'apiBase');
+  let url; try { url = new URL(apiBase); } catch { throw new Error('Set a trusted HTTPS chat host in user settings.'); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Stored keys require a trusted HTTPS chat host in user settings.');
+  return { apiBase, tenant: userSetting(config, 'tenant') };
+}
 function install(vscode, context) {
   let active;
   const trusted = () => { if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before attaching Visor.'); };
@@ -49,4 +55,4 @@ function install(vscode, context) {
   }));
   context.subscriptions.push({ dispose() { active?.abort(); } });
 }
-module.exports = { install, userSetting };
+module.exports = { install, userSetting, smokeSettings };

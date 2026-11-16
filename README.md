@@ -127,3 +127,7 @@ The extension never imports project MCP files or accepts executable/socket
 settings from a repository. Catalog, checkout and leases remain on Plane/CLI.
 This feature requires Visor #219; it does not use the ACP fixture backend. No
 Marketplace publication is included.
+
+The stored-key smoke command also uses user settings only, requires HTTPS before
+loading a key, and refuses redirects. Project settings cannot choose its credential
+destination. The isolated smoke transport fixtures remain unchanged.

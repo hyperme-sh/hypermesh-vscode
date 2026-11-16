@@ -38,13 +38,13 @@
           "type": "string",
           "default": "https://chat.test.hyperme.sh",
           "description": "Chat host. Smoke posts /v1/chat/completions here. Not the control-plane stub.",
-          "scope": "window"
+          "scope": "machine"
         },
         "hypermesh.tenant": {
           "type": "string",
           "default": "",
           "description": "Tenant id sent as X-Tenant-ID.",
-          "scope": "window"
+          "scope": "machine"
         },
         "hypermesh.acpExecutable": {
           "type": "string",
