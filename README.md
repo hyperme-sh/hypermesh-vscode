@@ -106,3 +106,28 @@ The package version is **0.1.0**, recorded in `package.json` and `.github/versio
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
+
+## Assigned Visor chat
+
+Set `hypermesh.acpExecutable` and `hypermesh.visorSocket` in user settings to the
+installed ACP adapter and private Visor socket. Run **Hypermesh: Chat with Visor**
+in a trusted local workspace. Visor must already have a currently assigned
+session and authorized host bridge. Turns use machine-authenticated Conductor
+routing and AIuditor; the editor never receives host credentials. The existing
+HTTPS chat-host smoke command still keeps its renter key in SecretStorage.
+
+Cancel from the progress notification or **Hypermesh: Cancel Visor turn**. An
+interrupted or unknown outcome is not retried. Responses open as plain text,
+without writing project files. Prompt text is sent only over the adapter's stdin
+and is not logged. Only one turn runs at a time.
+
+Set `hypermesh.companionExecutable` to the installed companion and use
+**Hypermesh: Manage Visor tool connections** to open its reviewed attachment UI.
+The extension never imports project MCP files or accepts executable/socket
+settings from a repository. Catalog, checkout and leases remain on Plane/CLI.
+This feature requires Visor #219; it does not use the ACP fixture backend. No
+Marketplace publication is included.
+
+The stored-key smoke command also uses user settings only, requires HTTPS before
+loading a key, and refuses redirects. Project settings cannot choose its credential
+destination. The isolated smoke transport fixtures remain unchanged.

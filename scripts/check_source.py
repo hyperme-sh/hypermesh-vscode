@@ -11,6 +11,7 @@ for entry in manifest['files']:
         if actual != entry['sha256']:
             raise SystemExit(f"Changed imported file: {entry['destination']}")
 expected = {entry['destination'] for entry in manifest['files'] if entry['destination'].startswith('src/')}
+expected.update(manifest.get('added_runtime_sources', []))
 actual = {path.relative_to(root).as_posix() for path in (root / 'src').rglob('*.js')}
 if actual != expected:
     raise SystemExit('Runtime source inventory differs from the imported package')

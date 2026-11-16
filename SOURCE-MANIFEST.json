@@ -30,7 +30,7 @@
       "source": "products/hypermesh-vscode/src/extension.js",
       "destination": "src/extension.js",
       "sha256": "ed852b6dbae94465614c87f37d5bb0641e4421a3981bf2306ecac515da511cf4",
-      "unchanged": true
+      "unchanged": false
     },
     {
       "source": "products/hypermesh-vscode/src/smoke.js",
@@ -44,5 +44,11 @@
       "sha256": "6af88ce8c88cd88daa841a35d3a23552bd5979522d65e258396f756b692aef8c",
       "unchanged": true
     }
+  ],
+  "added_runtime_sources": [
+    "src/acp.js",
+    "src/acp.test.js",
+    "src/editor.js",
+    "src/editor.test.js"
   ]
 }
