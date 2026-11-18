@@ -26,7 +26,7 @@ test('controls retain the observed revision and require owner acknowledgement', 
  await assert.rejects(exchange('/installed/companion','/project',control,fixture({}, {code:1})),/Refresh/);
 });
 test('wrong workspace, missing state and oversized responses are refused', async () => {
- for (const value of [{run:{...run,workspace:'/other'}},{}, {run:{...run,detail:'x'.repeat(70000)}}]) await assert.rejects(exchange('/installed/companion','/project',null,fixture(value)));
+ for (const value of [{run:{...run,workspace:'/other'}},{}, {run:{...run,detail:'x'.repeat(140000)}}]) await assert.rejects(exchange('/installed/companion','/project',null,fixture(value)));
 });
 test('tracking links are bounded central issue PR and check URLs only', () => {
  assert.deepEqual(tracking({tracking:['https://github.com/hyperme-sh/visor/issues/265','https://github.com/hyperme-sh/visor/pull/313','https://evil.test/steal','https://github.com/a/b/issues/1?token=secret']}),['https://github.com/hyperme-sh/visor/issues/265','https://github.com/hyperme-sh/visor/pull/313']);
@@ -67,4 +67,9 @@ test('successful exit waits for trailing stdout before acknowledging a control',
   return child;
  });
  assert.deepEqual(result.run,run);
+});
+test('advice reads use a dedicated command without sending controls', async()=>{
+ const advice={workspace:'/project',action:'checkpoint-compact',confidence:'medium',handoff:{goal:'Keep progress'}};
+ const got=await exchange('/installed/companion','/project','advice',fixture(advice,{inspect(call){assert.equal(call.argv[0],'--continue-advice-workspace');assert.equal(call.input,'');}}));assert.deepEqual(got,advice);
+ await assert.rejects(exchange('/installed/companion','/project','advice',fixture({...advice,workspace:'/other'})));
 });
