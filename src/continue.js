@@ -3,12 +3,12 @@ const { spawn } = require('node:child_process');
 const { userSetting } = require('./editor');
 const fail = () => new Error('Continue task unavailable. Refresh owner status before retrying.');
 function args(executable, workspace, action) {
-  if (![executable, workspace].every(v => typeof v === 'string' && path.isAbsolute(v) && !/[\r\n\0]/.test(v)) || !['status','control','open'].includes(action)) throw fail();
+  if (![executable, workspace].every(v => typeof v === 'string' && path.isAbsolute(v) && !/[\r\n\0]/.test(v)) || !['status','control','open','advice'].includes(action)) throw fail();
   return [executable, [action === 'open' ? '--continue-workspace' : `--continue-${action}-workspace`, workspace]];
 }
 function exchange(executable, workspace, control, spawnProcess = spawn) {
-  const [program, argv] = args(executable, workspace, control ? 'control' : 'status');
-  if (control && (!['continue-on','continue-off','pause','stop','resume'].includes(control.action) || !Number.isSafeInteger(control.revision) || control.revision < 1 || typeof control.run_id !== 'string')) return Promise.reject(fail());
+  const [program, argv] = args(executable, workspace, control === 'advice' ? 'advice' : control ? 'control' : 'status');
+  if (control && control !== 'advice' && (!['continue-on','continue-off','pause','stop','resume'].includes(control.action) || !Number.isSafeInteger(control.revision) || control.revision < 1 || typeof control.run_id !== 'string')) return Promise.reject(fail());
   return new Promise((resolve, reject) => {
     const env = {};
     for (const key of ['PATH','HOME','USERPROFILE','SystemRoot','WINDIR','LANG','XDG_RUNTIME_DIR','DBUS_SESSION_BUS_ADDRESS']) if (process.env[key]) env[key] = process.env[key];
@@ -18,12 +18,12 @@ function exchange(executable, workspace, control, spawnProcess = spawn) {
     const timer = setTimeout(() => finish(true), 20000);
     child.on('error', () => finish(true)); child.stdin.on('error', () => finish(true));
     child.stderr.on('data', () => {});
-    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 65536) finish(true); });
+    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 131072) finish(true); });
     child.on('close', code => {
       if (code !== 0) return finish(true);
-      try { const value = JSON.parse(raw.toString('utf8')); if (!Object.hasOwn(value, 'run') || (value.run !== null && (typeof value.run.id !== 'string' || value.run.workspace !== workspace || !Number.isSafeInteger(value.run.revision)))) throw fail(); finish(false, value); } catch { finish(true); }
+      try { const value = JSON.parse(raw.toString('utf8')); if (control === 'advice') { if (value.workspace !== workspace || !['continue','checkpoint-compact','restart','reassign','retire'].includes(value.action) || typeof value.handoff !== 'object') throw fail(); return finish(false,value); } if (!Object.hasOwn(value, 'run') || (value.run !== null && (typeof value.run.id !== 'string' || value.run.workspace !== workspace || !Number.isSafeInteger(value.run.revision)))) throw fail(); finish(false, value); } catch { finish(true); }
     });
-    child.stdin.end(control ? JSON.stringify(control) : '');
+    child.stdin.end(control && control !== 'advice' ? JSON.stringify(control) : '');
   });
 }
 function label(run) { return run ? `Continue ${run.continue_enabled ? 'on' : 'off'} · ${run.state} · ${run.used_chunks}/${run.budgets?.chunks}` : 'Continue: no selected task'; }
@@ -64,7 +64,7 @@ function install(vscode, context, request = exchange) {
       const project = workspace(); if (!project) throw new Error('Select a trusted local workspace.');
       await refresh();
       const run = current?.project === project ? current.run : null;
-      const options = ['Open task form and controls', 'Project styles and context plan', 'Refresh status'];
+      const options = ['Open task form and controls', 'Project styles and context plan', 'Agent recommendation and handoff', 'Refresh status'];
       if (run) options.push(run.continue_enabled ? 'Continue off' : 'Continue on', 'Pause', 'Resume', 'Stop', ...tracking(run));
       const choice = await vscode.window.showQuickPick(options, { title: label(run), placeHolder: run ? `${run.reason}; current chunk ${run.current || 'none'}` : 'Start a scoped task in Visor' });
       if (!choice) return;
@@ -73,6 +73,10 @@ function install(vscode, context, request = exchange) {
         const [program, argv] = args(executable(), project, 'open'); const child = spawn(program, argv, { shell:false, windowsHide:true, stdio:'ignore' });
         child.on('error', () => vscode.window.showErrorMessage('Visor task manager unavailable.'));
         child.on('exit', () => { void refresh(); });
+      } else if (choice === 'Agent recommendation and handoff') {
+        const advice = await request(executable(),project,'advice');
+        if (workspace() !== project) throw fail();
+        await vscode.window.showQuickPick([{label:advice.action,description:advice.confidence,detail:JSON.stringify({reasons:advice.reasons,observations:advice.contributing,unknown:advice.unknown,next:advice.next_action,handoff:advice.handoff})}],{title:'Agent advice · no worker change is applied'});
       } else if (choice === 'Refresh status') { await refresh(); }
       else if (tracking(run).includes(choice)) { await vscode.env.openExternal(vscode.Uri.parse(choice)); }
       else {
