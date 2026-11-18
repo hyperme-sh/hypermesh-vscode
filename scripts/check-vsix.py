@@ -9,7 +9,7 @@ expected = {
     '[Content_Types].xml', 'extension.vsixmanifest',
     'extension/package.json', 'extension/readme.md', 'extension/LICENSE.txt',
     'extension/src/extension.js', 'extension/src/smoke.js',
-    'extension/src/acp.js', 'extension/src/editor.js',
+    'extension/src/acp.js', 'extension/src/editor.js', 'extension/src/permissions.js',
 }
 with zipfile.ZipFile(sys.argv[1]) as archive:
     names = archive.namelist()
@@ -17,7 +17,7 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
         raise SystemExit(f'Unexpected VSIX inventory: {names}')
     assert archive.read('extension/LICENSE.txt') == (root / 'LICENSE').read_bytes()
     assert json.loads(archive.read('extension/package.json'))['license'] == 'Apache-2.0'
-    for name in ('src/extension.js', 'src/smoke.js', 'src/acp.js', 'src/editor.js'):
+    for name in ('src/extension.js', 'src/smoke.js', 'src/acp.js', 'src/editor.js', 'src/permissions.js'):
         if archive.read('extension/' + name) != (root / name).read_bytes():
             raise SystemExit(f'Packaged runtime differs: {name}')
     package = json.loads(archive.read('extension/package.json'))
