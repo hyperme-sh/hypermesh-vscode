@@ -51,6 +51,8 @@
     "src/editor.js",
     "src/editor.test.js",
     "src/permissions.js",
-    "src/permissions.test.js"
+    "src/permissions.test.js",
+    "src/continue.js",
+    "src/continue.test.js"
   ]
 }

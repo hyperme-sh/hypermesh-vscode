@@ -33,6 +33,10 @@
       {
         "command": "hypermesh.permissions",
         "title": "Hypermesh: Inspect and manage workspace permissions"
+      },
+      {
+        "command": "hypermesh.continue",
+        "title": "Hypermesh: Continue task controls"
       }
     ],
     "configuration": {
