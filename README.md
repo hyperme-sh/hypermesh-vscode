@@ -139,3 +139,18 @@ only owner-authorized edits. Configure the installed companion in user settings;
 workspace settings cannot select it. Reopen after reconnecting or changing the
 assigned organization. The editor keeps no permission database or credentials.
 Failed coding actions offer the same command to inspect why access changed.
+
+### Continue tasks
+
+**Hypermesh: Continue task controls** shows the selected workspace's durable
+Visor task. The status bar refreshes owner state, including Continue, chunk
+progress, limits and completion/blocker reasons. Open the native task form to
+start scoped work with Continue on by default; toggle Continue or pause/resume/
+stop from either client. Controls use the observed task revision and show only
+acknowledged state. Reconnect reads the existing task rather than starting one.
+
+The installed companion handles private-socket identity and owner authorization.
+The extension never reads credentials or opens an unauthenticated service port.
+Workspace or active-editor changes clear stale status. Central GitHub issue, PR
+and check links supplied with the task can be opened from the same menu. Changing
+scope or limits requires stopping the selected task before replacement.
