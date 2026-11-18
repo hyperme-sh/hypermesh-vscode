@@ -73,3 +73,8 @@ test('advice reads use a dedicated command without sending controls', async()=>{
  const got=await exchange('/installed/companion','/project','advice',fixture(advice,{inspect(call){assert.equal(call.argv[0],'--continue-advice-workspace');assert.equal(call.input,'');}}));assert.deepEqual(got,advice);
  await assert.rejects(exchange('/installed/companion','/project','advice',fixture({...advice,workspace:'/other'})));
 });
+test('explicit worker controls preserve revision and idempotent request ID',async()=>{
+ const control={run_id:run.id,revision:7,action:'restart',request_id:'22222222-2222-4222-8222-222222222222'};
+ const ack={run:{...run,revision:8},handoff:{old_worker:'old',new_worker:'new',generation:2,unfinished:true}};
+ const result=await exchange('/installed/companion','/project',control,fixture(ack,{inspect(call){assert.deepEqual(JSON.parse(call.input),control)}}));assert.equal(result.handoff.generation,2);
+});
