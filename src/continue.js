@@ -18,7 +18,7 @@ function exchange(executable, workspace, control, spawnProcess = spawn) {
     const timer = setTimeout(() => finish(true), 20000);
     child.on('error', () => finish(true)); child.stdin.on('error', () => finish(true));
     child.stderr.on('data', () => {});
-    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 32768) finish(true); });
+    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 65536) finish(true); });
     child.on('close', code => {
       if (code !== 0) return finish(true);
       try { const value = JSON.parse(raw.toString('utf8')); if (!Object.hasOwn(value, 'run') || (value.run !== null && (typeof value.run.id !== 'string' || value.run.workspace !== workspace || !Number.isSafeInteger(value.run.revision)))) throw fail(); finish(false, value); } catch { finish(true); }
