@@ -1,4 +1,5 @@
 const path = require('node:path');
+const {randomUUID} = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { userSetting } = require('./editor');
 const fail = () => new Error('Continue task unavailable. Refresh owner status before retrying.');
@@ -8,7 +9,7 @@ function args(executable, workspace, action) {
 }
 function exchange(executable, workspace, control, spawnProcess = spawn) {
   const [program, argv] = args(executable, workspace, control === 'advice' ? 'advice' : control ? 'control' : 'status');
-  if (control && control !== 'advice' && (!['continue-on','continue-off','pause','stop','resume'].includes(control.action) || !Number.isSafeInteger(control.revision) || control.revision < 1 || typeof control.run_id !== 'string')) return Promise.reject(fail());
+  if (control && control !== 'advice' && (!['continue-on','continue-off','pause','stop','resume','restart','reassign','retire'].includes(control.action) || !Number.isSafeInteger(control.revision) || control.revision < 1 || typeof control.run_id !== 'string')) return Promise.reject(fail());
   return new Promise((resolve, reject) => {
     const env = {};
     for (const key of ['PATH','HOME','USERPROFILE','SystemRoot','WINDIR','LANG','XDG_RUNTIME_DIR','DBUS_SESSION_BUS_ADDRESS']) if (process.env[key]) env[key] = process.env[key];
@@ -65,7 +66,7 @@ function install(vscode, context, request = exchange) {
       await refresh();
       const run = current?.project === project ? current.run : null;
       const options = ['Open task form and controls', 'Project styles and context plan', 'Agent recommendation and handoff', 'Refresh status'];
-      if (run) options.push(run.continue_enabled ? 'Continue off' : 'Continue on', 'Pause', 'Resume', 'Stop', ...tracking(run));
+      if (run) options.push(run.continue_enabled ? 'Continue off' : 'Continue on', 'Pause', 'Resume', 'Stop', 'Restart worker', 'Reassign worker', 'Retire worker', ...tracking(run));
       const choice = await vscode.window.showQuickPick(options, { title: label(run), placeHolder: run ? `${run.reason}; current chunk ${run.current || 'none'}` : 'Start a scoped task in Visor' });
       if (!choice) return;
       if (workspace() !== project) throw fail();
@@ -81,8 +82,15 @@ function install(vscode, context, request = exchange) {
       else if (tracking(run).includes(choice)) { await vscode.env.openExternal(vscode.Uri.parse(choice)); }
       else {
         if (!run || current?.project !== project || current.run?.id !== run.id) throw fail();
-        const actions = { 'Continue off':'continue-off','Continue on':'continue-on',Pause:'pause',Resume:'resume',Stop:'stop' };
-        await request(executable(), project, { run_id:run.id, revision:run.revision, action:actions[choice] });
+        const actions = { 'Continue off':'continue-off','Continue on':'continue-on',Pause:'pause',Resume:'resume',Stop:'stop','Restart worker':'restart','Reassign worker':'reassign','Retire worker':'retire' };
+        const control={run_id:run.id,revision:run.revision,action:actions[choice]};
+        if (['restart','reassign','retire'].includes(control.action)) {
+          if (await vscode.window.showQuickPick(['Apply selected worker action','Cancel'],{title:'Checkpoint task and change worker within the same assigned machine. Pause and spent limits are preserved.'}) !== 'Apply selected worker action') return;
+          if (workspace() !== project) throw fail();
+          control.request_id=randomUUID();
+        }
+        const ack=await request(executable(), project,control);
+        if (ack.handoff) await vscode.window.showInformationMessage(`Worker ${ack.handoff.old_worker || 'none'} → ${ack.handoff.new_worker || 'retired'}; generation ${ack.handoff.generation}; unfinished work retained: ${ack.handoff.unfinished}`);
         await refresh();
       }
     } catch (error) { vscode.window.showErrorMessage(error instanceof Error ? error.message : fail().message); }
