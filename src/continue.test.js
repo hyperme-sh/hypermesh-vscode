@@ -5,7 +5,7 @@ const { args, exchange, label, tracking } = require('./continue');
 function fixture(response, { code = 0, inspect = () => {} } = {}) {
  return (program, argv, options) => {
   const child = new EventEmitter(); child.stdin = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
-  child.stdin.end = input => { inspect({ program, argv, options, input }); queueMicrotask(() => { child.stdout.emit('data', Buffer.from(JSON.stringify(response))); child.emit('exit', code); }); };
+  child.stdin.end = input => { inspect({ program, argv, options, input }); queueMicrotask(() => { child.stdout.emit('data', Buffer.from(JSON.stringify(response))); child.emit('exit', code); child.emit('close', code); }); };
   return child;
  };
 }
@@ -52,4 +52,19 @@ test('task menu awaits initial refresh and works from an untitled chat answer', 
  const f=editorFixture();let resolve;
  const {install}=require('./continue');install(f.vscode,f.context,(_executable,workspace)=>{assert.equal(workspace,'/project');return new Promise(r=>{resolve=r;});});
  try {const command=f.commands.get('hypermesh.continue')();await Promise.resolve();assert.equal(f.selections.length,0);resolve({run});await command;assert.ok(f.selections[0].includes('Pause'));assert.ok(f.selections[0].includes('Continue on'));} finally {f.dispose();}
+});
+
+test('successful exit waits for trailing stdout before acknowledging a control', async () => {
+ const control = {run_id:run.id,revision:7,action:'pause'};
+ const result = await exchange('/installed/companion','/project',control,() => {
+  const child = new EventEmitter(); child.stdin = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  child.stdin.end = () => queueMicrotask(() => {
+   child.stdout.emit('data', Buffer.from('{"run":'));
+   child.emit('exit', 0);
+   child.stdout.emit('data', Buffer.from(JSON.stringify(run) + '}'));
+   child.emit('close', 0);
+  });
+  return child;
+ });
+ assert.deepEqual(result.run,run);
 });
