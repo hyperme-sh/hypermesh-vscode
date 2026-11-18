@@ -28,29 +28,35 @@ function exchange(executable, workspace, control, spawnProcess = spawn) {
 }
 function label(run) { return run ? `Continue ${run.continue_enabled ? 'on' : 'off'} · ${run.state} · ${run.used_chunks}/${run.budgets?.chunks}` : 'Continue: no selected task'; }
 function tracking(run) { return (Array.isArray(run?.tracking) ? run.tracking : []).filter(url => typeof url === 'string' && /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull|actions\/runs)\/[0-9]+$/.test(url)).slice(0,12); }
-function install(vscode, context) {
+function install(vscode, context, request = exchange) {
   const bar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 40);
   bar.command = 'hypermesh.continue';
-  let current, busy = false, disposed = false, generation = 0, previous = '';
+  let current, pending, disposed = false, generation = 0, previous = '';
   const workspace = () => {
     if (!vscode.workspace.isTrusted) return undefined;
     const active = vscode.window.activeTextEditor?.document?.uri;
-    const folder = active ? vscode.workspace.getWorkspaceFolder(active) : vscode.workspace.workspaceFolders?.length === 1 ? vscode.workspace.workspaceFolders[0] : undefined;
+    const folder = (active ? vscode.workspace.getWorkspaceFolder(active) : undefined) ?? (vscode.workspace.workspaceFolders?.length === 1 ? vscode.workspace.workspaceFolders[0] : undefined);
     return folder?.uri.scheme === 'file' ? folder.uri.fsPath : undefined;
   };
   const executable = () => userSetting(vscode.workspace.getConfiguration('hypermesh'), 'companionExecutable');
-  async function refresh() {
-    if (busy || disposed) return;
-    const project = workspace(); if (!project || !executable()) {current = undefined; bar.hide(); return;}
-    const captured = generation; busy = true;
+  function refresh() {
+    if (disposed) return Promise.resolve();
+    const project = workspace();
+    if (pending) return pending.project === project && pending.generation === generation ? pending.promise : pending.promise.then(() => refresh());
+    const flight = { project, generation }; pending = flight;
+    flight.promise = read(project, generation).finally(() => { if (pending === flight) pending = undefined; });
+    return flight.promise;
+  }
+  async function read(project, captured) {
+    if (!project || !executable()) {current = undefined; previous = ''; bar.hide(); return;}
     try {
-      const value = await exchange(executable(), project);
+      const value = await request(executable(), project);
       if (disposed || captured !== generation || workspace() !== project) return;
       current = { project, run: value.run }; const text = label(value.run);
       if (text !== previous) { previous = text; bar.text = `$(sync) ${text}`; }
       bar.tooltip = value.run ? `Task ${value.run.id}\nCurrent: ${value.run.current || 'none'}\n${value.run.reason}\nReserved tokens: ${value.run.used_tokens}/${value.run.budgets?.tokens}` : 'Start or attach to the owner-selected Visor task'; bar.show();
-    } catch { if (captured === generation) { current = undefined; bar.text = '$(warning) Continue: reconnect'; bar.show(); } }
-    finally { busy = false; }
+    } catch { if (captured === generation) { current = undefined; previous = ''; bar.text = '$(warning) Continue: reconnect'; bar.show(); } }
+
   }
   const reset = () => { generation++; current = undefined; previous = ''; bar.hide(); void refresh(); };
   context.subscriptions.push(vscode.commands.registerCommand('hypermesh.continue', async () => {
@@ -72,7 +78,7 @@ function install(vscode, context) {
       else {
         if (!run || current?.project !== project || current.run?.id !== run.id) throw fail();
         const actions = { 'Continue off':'continue-off','Continue on':'continue-on',Pause:'pause',Resume:'resume',Stop:'stop' };
-        await exchange(executable(), project, { run_id:run.id, revision:run.revision, action:actions[choice] });
+        await request(executable(), project, { run_id:run.id, revision:run.revision, action:actions[choice] });
         await refresh();
       }
     } catch (error) { vscode.window.showErrorMessage(error instanceof Error ? error.message : fail().message); }
@@ -81,5 +87,6 @@ function install(vscode, context) {
   const timer = setInterval(() => { void refresh(); }, 5000);
   context.subscriptions.push({ dispose() { disposed = true; clearInterval(timer); generation++; } });
   void refresh();
+  return { refresh };
 }
 module.exports = { args, exchange, label, tracking, install };

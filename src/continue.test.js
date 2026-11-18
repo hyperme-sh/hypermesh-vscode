@@ -33,3 +33,23 @@ test('tracking links are bounded central issue PR and check URLs only', () => {
  assert.match(label({...run,state:'completed'}),/completed/);
  assert.match(label({...run,state:'external-blocker'}),/external-blocker/);
 });
+function editorFixture() {
+ const commands = new Map(), selections = [], bar = { show(){},hide(){},dispose(){} };
+ const context = { subscriptions:[] }; const dispose = () => context.subscriptions.forEach(v => v.dispose());
+ const vscode = {
+  StatusBarAlignment:{Left:1},
+  window:{createStatusBarItem:()=>bar,activeTextEditor:{document:{uri:{scheme:'untitled'}}},onDidChangeActiveTextEditor:()=>({dispose(){}}),showQuickPick:async options=>{selections.push(options);return undefined;},showErrorMessage:message=>{throw Error(message);}},
+  workspace:{isTrusted:true,workspaceFolders:[{uri:{scheme:'file',fsPath:'/project'}}],getWorkspaceFolder:()=>undefined,getConfiguration:()=>({inspect:()=>({globalValue:'/installed/companion'})}),onDidChangeWorkspaceFolders:()=>({dispose(){}})},
+  commands:{registerCommand:(name,fn)=>{commands.set(name,fn);return {dispose(){}};}}
+ };return {vscode,context,commands,selections,bar,dispose};
+}
+test('recovered unchanged owner state replaces reconnect warning', async () => {
+ const f=editorFixture();let reads=0;
+ const {install}=require('./continue');const client=install(f.vscode,f.context,async()=>{if(++reads===2)throw Error('offline');return {run};});
+ try {await client.refresh();assert.match(f.bar.text,/Continue off/);await client.refresh();assert.match(f.bar.text,/reconnect/);await client.refresh();assert.match(f.bar.text,/Continue off/);} finally {f.dispose();}
+});
+test('task menu awaits initial refresh and works from an untitled chat answer', async () => {
+ const f=editorFixture();let resolve;
+ const {install}=require('./continue');install(f.vscode,f.context,(_executable,workspace)=>{assert.equal(workspace,'/project');return new Promise(r=>{resolve=r;});});
+ try {const command=f.commands.get('hypermesh.continue')();await Promise.resolve();assert.equal(f.selections.length,0);resolve({run});await command;assert.ok(f.selections[0].includes('Pause'));assert.ok(f.selections[0].includes('Continue on'));} finally {f.dispose();}
+});
