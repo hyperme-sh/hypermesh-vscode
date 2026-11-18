@@ -18,7 +18,7 @@ function exchange(executable, workspace, control, spawnProcess = spawn) {
     const timer = setTimeout(() => finish(true), 20000);
     child.on('error', () => finish(true)); child.stdin.on('error', () => finish(true));
     child.stderr.on('data', () => {});
-    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 32768) finish(true); });
+    child.stdout.on('data', bytes => { if (done) return; raw = Buffer.concat([raw, bytes]); if (raw.length > 65536) finish(true); });
     child.on('close', code => {
       if (code !== 0) return finish(true);
       try { const value = JSON.parse(raw.toString('utf8')); if (!Object.hasOwn(value, 'run') || (value.run !== null && (typeof value.run.id !== 'string' || value.run.workspace !== workspace || !Number.isSafeInteger(value.run.revision)))) throw fail(); finish(false, value); } catch { finish(true); }
@@ -54,7 +54,7 @@ function install(vscode, context, request = exchange) {
       if (disposed || captured !== generation || workspace() !== project) return;
       current = { project, run: value.run }; const text = label(value.run);
       if (text !== previous) { previous = text; bar.text = `$(sync) ${text}`; }
-      bar.tooltip = value.run ? `Task ${value.run.id}\nCurrent: ${value.run.current || 'none'}\n${value.run.reason}\nReserved tokens: ${value.run.used_tokens}/${value.run.budgets?.tokens}` : 'Start or attach to the owner-selected Visor task'; bar.show();
+      bar.tooltip = value.run ? `Task ${value.run.id}\nCurrent: ${value.run.current || 'none'}\n${value.run.reason}\nReserved tokens: ${value.run.used_tokens}/${value.run.budgets?.tokens}\nProject style: ${value.run.project_settings?.style || 'manual'}\nContext: ${value.run.project?.budget?.source || 'unknown'}` : 'Start or attach to the owner-selected Visor task'; bar.show();
     } catch { if (captured === generation) { current = undefined; previous = ''; bar.text = '$(warning) Continue: reconnect'; bar.show(); } }
 
   }
@@ -64,12 +64,12 @@ function install(vscode, context, request = exchange) {
       const project = workspace(); if (!project) throw new Error('Select a trusted local workspace.');
       await refresh();
       const run = current?.project === project ? current.run : null;
-      const options = ['Open task form and controls', 'Refresh status'];
+      const options = ['Open task form and controls', 'Project styles and context plan', 'Refresh status'];
       if (run) options.push(run.continue_enabled ? 'Continue off' : 'Continue on', 'Pause', 'Resume', 'Stop', ...tracking(run));
       const choice = await vscode.window.showQuickPick(options, { title: label(run), placeHolder: run ? `${run.reason}; current chunk ${run.current || 'none'}` : 'Start a scoped task in Visor' });
       if (!choice) return;
       if (workspace() !== project) throw fail();
-      if (choice === 'Open task form and controls') {
+      if ((choice === 'Open task form and controls' || choice === 'Project styles and context plan')) {
         const [program, argv] = args(executable(), project, 'open'); const child = spawn(program, argv, { shell:false, windowsHide:true, stdio:'ignore' });
         child.on('error', () => vscode.window.showErrorMessage('Visor task manager unavailable.'));
         child.on('exit', () => { void refresh(); });
