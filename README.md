@@ -131,3 +131,11 @@ Marketplace publication is included.
 The stored-key smoke command also uses user settings only, requires HTTPS before
 loading a key, and refuses redirects. Project settings cannot choose its credential
 destination. The isolated smoke transport fixtures remain unchanged.
+
+Use **Hypermesh: Inspect and manage workspace permissions** to open the installed
+native permission manager for the selected local workspace. The manager shows
+scoped templates, learned allows, current policy and dreaming changes, and offers
+only owner-authorized edits. Configure the installed companion in user settings;
+workspace settings cannot select it. Reopen after reconnecting or changing the
+assigned organization. The editor keeps no permission database or credentials.
+Failed coding actions offer the same command to inspect why access changed.
