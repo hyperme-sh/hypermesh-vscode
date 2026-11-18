@@ -29,6 +29,10 @@
       {
         "command": "hypermesh.attachTools",
         "title": "Hypermesh: Manage Visor tool connections"
+      },
+      {
+        "command": "hypermesh.permissions",
+        "title": "Hypermesh: Inspect and manage workspace permissions"
       }
     ],
     "configuration": {

@@ -49,6 +49,8 @@
     "src/acp.js",
     "src/acp.test.js",
     "src/editor.js",
-    "src/editor.test.js"
+    "src/editor.test.js",
+    "src/permissions.js",
+    "src/permissions.test.js"
   ]
 }

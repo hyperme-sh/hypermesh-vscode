@@ -39,8 +39,19 @@ function install(vscode, context) {
         await vscode.window.showTextDocument(document, { preview: true });
       } finally { if (active === controller) active = undefined; }
     } catch (error) {
-      vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Visor request unavailable.');
+      const action = await vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Visor request unavailable.', 'Inspect workspace permissions');
+      if (action === 'Inspect workspace permissions') await vscode.commands.executeCommand('hypermesh.permissions');
     }
+  }));
+  context.subscriptions.push(vscode.commands.registerCommand('hypermesh.permissions', async () => {
+    try {
+      trusted();
+      const folders = vscode.workspace.workspaceFolders || [];
+      const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick();
+      if (!folder || folder.uri.scheme !== 'file') throw new Error('Select a local project folder.');
+      const config = vscode.workspace.getConfiguration('hypermesh');
+      await require('./permissions').openManager(userSetting(config, 'companionExecutable'), folder.uri.fsPath);
+    } catch (error) { vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Permissions unavailable.'); }
   }));
   context.subscriptions.push(vscode.commands.registerCommand('hypermesh.cancel', () => active?.abort()));
   context.subscriptions.push(vscode.commands.registerCommand('hypermesh.attachTools', async () => {

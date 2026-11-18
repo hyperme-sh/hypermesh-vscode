@@ -6,3 +6,5 @@
 !LICENSE
 !src/acp.js
 !src/editor.js
+
+!src/permissions.js
