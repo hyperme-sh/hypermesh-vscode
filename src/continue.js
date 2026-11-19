@@ -27,7 +27,7 @@ function exchange(executable, workspace, control, spawnProcess = spawn) {
     child.stdin.end(control && control !== 'advice' ? JSON.stringify(control) : '');
   });
 }
-function label(run) { return run ? `Continue ${run.continue_enabled ? 'on' : 'off'} · ${run.state} · ${run.used_chunks}/${run.budgets?.chunks}` : 'Continue: no selected task'; }
+function label(run) { return run ? `Continue ${run.continue_enabled ? 'on' : 'off'} · ${run.state} · ${run.used_chunks}/${(run.budgets?.chunks ?? 0) * (1 + (run.execution?.max_repairs ?? 0))} attempts` : 'Continue: no selected task'; }
 function tracking(run) { return (Array.isArray(run?.tracking) ? run.tracking : []).filter(url => typeof url === 'string' && /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(issues|pull|actions\/runs)\/[0-9]+$/.test(url)).slice(0,12); }
 function install(vscode, context, request = exchange) {
   const bar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 40);
@@ -55,7 +55,7 @@ function install(vscode, context, request = exchange) {
       if (disposed || captured !== generation || workspace() !== project) return;
       current = { project, run: value.run }; const text = label(value.run);
       if (text !== previous) { previous = text; bar.text = `$(sync) ${text}`; }
-      bar.tooltip = value.run ? `Task ${value.run.id}\nCurrent: ${value.run.current || 'none'}\n${value.run.reason}\nReserved tokens: ${value.run.used_tokens}/${value.run.budgets?.tokens}\nProject style: ${value.run.project_settings?.style || 'manual'}\nContext: ${value.run.project?.budget?.source || 'unknown'}` : 'Start or attach to the owner-selected Visor task'; bar.show();
+      bar.tooltip = value.run ? `Task ${value.run.id}\nCurrent: ${value.run.current || 'none'}\n${value.run.reason}\nReserved tokens: ${value.run.used_tokens}/${value.run.budgets?.tokens}\nSpending: ${value.run.budgets?.money ? `${value.run.budgets.money.currency} ${((value.run.reserved_micros || 0) / 1e6).toFixed(6)} reserved maximum / ${(value.run.budgets.money.limit_micros / 1e6).toFixed(6)} limit` : 'no monetary cap (older task)'}\nProject style: ${value.run.project_settings?.style || 'manual'}\nContext: ${value.run.project?.budget?.source || 'unknown'}` : 'Start or attach to the owner-selected Visor task'; bar.show();
     } catch { if (captured === generation) { current = undefined; previous = ''; bar.text = '$(warning) Continue: reconnect'; bar.show(); } }
 
   }
