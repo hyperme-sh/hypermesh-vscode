@@ -164,3 +164,9 @@ command, attach to an existing task ID and output cursor, or request cancellatio
 The integrated terminal follows Visor's output and exit state. Closing the view
 detaches from the task. The menu also opens the existing workspace permissions
 view. Setup and CLI usage are in the [Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md).
+
+For a declaration with `"interactive": true`, choose **Attach with input**
+to claim the exact task terminal. Confirm a transfer if another client owns
+input. The terminal tab shows the current owner and last acknowledgement.
+Keystrokes and resize events go to that task. **Attach to task** follows output
+as a viewer, and closing either view detaches.
