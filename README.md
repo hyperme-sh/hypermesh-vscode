@@ -154,3 +154,13 @@ The extension never reads credentials or opens an unauthenticated service port.
 Workspace or active-editor changes clear stale status. Central GitHub issue, PR
 and check links supplied with the task can be opened from the same menu. Changing
 scope or limits requires stopping the selected task before replacement.
+
+### Local Visor terminal task
+
+In a trusted local workspace, set `hypermesh.companionExecutable` in User
+Settings to the absolute path of the installed `hypermesh-companion`. Use
+**Hypermesh: Visor terminal task** to check access, review and run the owner-declared
+command, attach to an existing task ID and output cursor, or request cancellation.
+The integrated terminal follows Visor's output and exit state. Closing the view
+detaches from the task. The menu also opens the existing workspace permissions
+view. Setup and CLI usage are in the [Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md).
