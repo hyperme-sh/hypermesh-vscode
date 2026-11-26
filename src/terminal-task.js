@@ -15,7 +15,7 @@ function exchange(program, workspace, operation, spawnProcess = spawn) {
     return Promise.reject(unavailable());
   }
   const env = {};
-  for (const key of ['PATH', 'HOME', 'LANG', 'XDG_RUNTIME_DIR']) {
+  for (const key of ['PATH', 'HOME', 'LANG', 'XDG_RUNTIME_DIR', 'XDG_STATE_HOME', 'HYPERMESH_RUNTIME_DIR', 'WSL_DISTRO_NAME']) {
     if (process.env[key]) env[key] = process.env[key];
   }
   return new Promise((resolve, reject) => {
@@ -245,30 +245,68 @@ function attach(vscode, project, scope, id, cursor, request, current, grant) {
   terminal.show();
 }
 
-function install(vscode, context, call = exchange) {
+function install(vscode, context, call = exchange, runtime = {
+  platform: process.platform, distro: process.env.WSL_DISTRO_NAME,
+}) {
+  function activeDistro() {
+    if (vscode.env.remoteName !== 'wsl') return undefined;
+    if (runtime.platform !== 'linux' || !vscode.ExtensionKind ||
+        context.extension?.extensionKind !== vscode.ExtensionKind.Workspace) {
+      throw new Error('Run the Hypermesh extension in the active WSL workspace host.');
+    }
+    const name = runtime.distro;
+    if (typeof name !== 'string' || name.length === 0 || Buffer.byteLength(name) > 1024 ||
+        name.trim() !== name || /[\/\\\p{Cc}]/u.test(name)) {
+      throw new Error('The active WSL distribution could not be identified.');
+    }
+    return name;
+  }
+  function linuxPath(value) {
+    return value.startsWith('/') && !value.startsWith('//') && !/^\/[a-z]:/i.test(value) &&
+      !/[\\\p{Cc}]/u.test(value);
+  }
   function project() {
-    if (!vscode.workspace.isTrusted || vscode.env.remoteName) return undefined;
+    if (!vscode.workspace.isTrusted || (vscode.env.remoteName && vscode.env.remoteName !== 'wsl')) return undefined;
+    const distro = activeDistro();
     const active = vscode.window.activeTextEditor?.document?.uri;
     const folder = (active && vscode.workspace.getWorkspaceFolder(active)) ??
       (vscode.workspace.workspaceFolders?.length === 1 ? vscode.workspace.workspaceFolders[0] : undefined);
-    return folder?.uri.scheme === 'file' ? folder.uri.fsPath : undefined;
+    if (folder?.uri.scheme !== 'file') return undefined;
+    const workspace = folder.uri.fsPath;
+    if (distro && (folder.uri.authority || !linuxPath(workspace))) {
+      throw new Error('Use the Linux workspace path inside the active WSL distribution.');
+    }
+    return workspace;
   }
   function request(workspace, operation) {
     if (project() !== workspace) throw unavailable();
     const executable = userSetting(vscode.workspace.getConfiguration('hypermesh'), 'companionExecutable');
-    return call(executable, workspace, operation);
+    const distro = activeDistro();
+    const pending = call(executable, workspace, operation);
+    if (!distro) return pending;
+    return pending.catch(() => {
+      throw new Error(`Visor unavailable in WSL ${distro} for ${workspace}. Check the companion in that distribution.`);
+    });
   }
   context.subscriptions.push(vscode.commands.registerCommand('hypermesh.terminalTask', async () => {
     let starting;
     try {
       const workspace = project();
-      if (!workspace) throw new Error('Open a trusted local workspace to use Visor terminal tasks.');
+      if (!workspace) {
+        const location = vscode.env.remoteName === 'wsl' ? 'WSL' : 'local';
+        throw new Error(`Open a trusted ${location} workspace to use Visor terminal tasks.`);
+      }
+      const distro = activeDistro();
       const scope = contextFor(await request(workspace, { type: 'context' }));
+      if (distro && (scope.wsl_distro !== distro || scope.workspace !== workspace)) {
+        throw new Error('Visor reported a different WSL distribution or workspace.');
+      }
       if (project() !== workspace) throw unavailable();
       const choices = ['Attach to task', 'Attach with input', 'Cancel task', 'Workspace permissions'];
       if (scope.access === 'ready' && scope.task) choices.unshift('Run declared task');
       const choice = await vscode.window.showQuickPick(choices, {
-        title: `Visor terminal · connected · access ${scope.access}`,
+        title: distro ? `Visor terminal · WSL ${distro} · ${workspace} · access ${scope.access}` :
+          `Visor terminal · connected · access ${scope.access}`,
         placeHolder: scope.task ? scope.task.command : 'No terminal task declared',
       });
       if (!choice) return;
@@ -283,7 +321,7 @@ function install(vscode, context, call = exchange) {
             typeof task.cwd !== 'string' || !Array.isArray(task.args) || task.environment !== 'clean') throw unavailable();
         const answer = await vscode.window.showWarningMessage('Run the declared Visor terminal task?', {
           modal: true,
-          detail: `Workspace: ${workspace}\nDirectory: ${task.cwd}\nCommand: ${JSON.stringify([task.command, ...task.args])}\nEnvironment: clean\nMode: ${task.interactive ? 'interactive' : 'view only'}\nTimeout: ${task.timeout_seconds}s`,
+          detail: `${distro ? `WSL distribution: ${distro}\n` : ''}Workspace: ${workspace}\nDirectory: ${task.cwd}\nCommand: ${JSON.stringify([task.command, ...task.args])}\nEnvironment: clean\nMode: ${task.interactive ? 'interactive' : 'view only'}\nTimeout: ${task.timeout_seconds}s`,
         }, 'Run Task');
         if (answer !== 'Run Task') return;
         starting = randomUUID();

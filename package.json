@@ -12,6 +12,7 @@
   ],
   "main": "./src/extension.js",
   "activationEvents": [],
+  "extensionKind": ["workspace"],
   "contributes": {
     "commands": [
       {
@@ -100,7 +101,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Visor terminal tasks and workspace lint require a trusted local workspace."
+      "description": "Visor terminal tasks require a trusted local or WSL workspace. Workspace lint requires a trusted local workspace."
     }
   }
 }
