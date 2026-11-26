@@ -12,3 +12,4 @@
 !src/continue.js
 
 !src/terminal-task.js
+!src/workspace-lint.js

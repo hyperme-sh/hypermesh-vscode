@@ -55,6 +55,8 @@
     "src/continue.js",
     "src/continue.test.js",
     "src/terminal-task.js",
-    "src/terminal-task.test.js"
+    "src/terminal-task.test.js",
+    "src/workspace-lint.js",
+    "src/workspace-lint.test.js"
   ]
 }

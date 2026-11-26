@@ -5,6 +5,7 @@ function activate(context) {
   require("./editor").install(vscode, context);
   require("./continue").install(vscode, context);
   require("./terminal-task").install(vscode, context);
+  require("./workspace-lint").install(vscode, context);
   context.subscriptions.push(
     vscode.commands.registerCommand("hypermesh.smoke", async () => {
       const config = vscode.workspace.getConfiguration("hypermesh");
