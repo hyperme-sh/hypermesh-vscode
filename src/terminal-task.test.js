@@ -12,18 +12,23 @@ const scope = { boot, session, binding, access: 'ready', task: {
   revision, cwd: workspace + '/src', command: '/bin/pwd', args: [], environment: 'clean', timeout_seconds: 5,
 } };
 
-function fixture({ trusted = true, remoteName, choice, input, onConfirm, respond } = {}) {
+function fixture({
+  trusted = true, remoteName, choice, input, onConfirm, respond, project = workspace,
+  placement = 2, runtime = { platform: 'linux', distro: 'Ubuntu' },
+} = {}) {
   const entries = [];
   const output = [];
   const errors = [];
   const confirmations = [];
+  const menus = [];
   let command;
   let pty;
   const vscode = {
     env: { remoteName },
+    ExtensionKind: { UI: 1, Workspace: 2 },
     workspace: {
       isTrusted: trusted,
-      workspaceFolders: [{ uri: { scheme: 'file', fsPath: workspace } }],
+      workspaceFolders: [{ uri: { scheme: 'file', fsPath: project } }],
       getConfiguration: () => ({ inspect: () => ({ globalValue: '/installed/companion' }) }),
     },
     commands: { registerCommand: (_, handler) => { command = handler; } },
@@ -32,7 +37,11 @@ function fixture({ trusted = true, remoteName, choice, input, onConfirm, respond
       dispose() {}
     },
     window: {
-      showQuickPick: async (options) => { assert.ok(options.includes(choice)); return choice; },
+      showQuickPick: async (options, details) => {
+        menus.push(details.title);
+        if (choice) assert.ok(options.includes(choice));
+        return choice;
+      },
       showWarningMessage: async (title, options, action) => {
         confirmations.push(title);
         if (action === 'Run Task') {
@@ -47,19 +56,20 @@ function fixture({ trusted = true, remoteName, choice, input, onConfirm, respond
       createTerminal: ({ pty: value }) => { pty = value; return { show: () => pty.open() }; },
     },
   };
-  install(vscode, { subscriptions: [] }, async (exe, project, operation) => {
+  install(vscode, { subscriptions: [], extension: { extensionKind: placement } }, async (exe, path, operation) => {
     assert.equal(exe, '/installed/companion');
-    assert.equal(project, workspace);
+    assert.equal(path, project);
     entries.push(operation);
-    if (operation.type === 'context') return scope;
+    if (operation.type === 'context') return remoteName === 'wsl' ?
+      respond?.(operation) ?? { ...scope, workspace: project, wsl_distro: runtime.distro } : scope;
     const override = respond?.(operation);
     if (override) return override;
     const outputText = operation.type === 'read' ? 'done\n' : '';
     return { id: operation.id, session, status: 'completed', exit_code: 0,
       access: 'ready', cursor: (operation.cursor || 0) + Buffer.byteLength(outputText), more: false,
       truncated: false, output_base64: Buffer.from(outputText).toString('base64') };
-  });
-  return { entries, output, errors, confirmations, pty: () => pty, open: () => command(), close: () => pty?.close() };
+  }, runtime);
+  return { entries, output, errors, confirmations, menus, pty: () => pty, open: () => command(), close: () => pty?.close() };
 }
 
 test('Restricted Mode and remote workspaces refuse before starting a helper', async () => {
@@ -68,6 +78,46 @@ test('Restricted Mode and remote workspaces refuse before starting a helper', as
     await client.open();
     assert.deepEqual(client.entries, []);
     assert.match(client.errors[0], /trusted local workspace/);
+  }
+});
+
+test('a trusted WSL extension host runs and labels the same scoped terminal task', async () => {
+  const view = fixture({ remoteName: 'wsl', choice: 'Run declared task' });
+  await view.open();
+  assert.deepEqual(view.entries.map(op => op.type), ['context', 'start', 'read']);
+  assert.match(view.menus[0], /WSL Ubuntu · \/fixture\/workspace · access ready/);
+  assert.deepEqual(view.errors, []);
+  view.close();
+});
+
+test('WSL rejects untrusted windows, UI extension placement, and Windows paths before spawn', async () => {
+  const cases = [
+    [{ trusted: false }, /trusted WSL workspace/],
+    [{ placement: 1 }, /WSL workspace host/],
+    [{ runtime: { platform: 'win32', distro: 'Ubuntu' } }, /WSL workspace host/],
+    [{ runtime: { platform: 'linux' } }, /could not be identified/],
+    [{ project: 'C:/work' }, /Linux workspace path/],
+    [{ project: '//wsl.localhost/Ubuntu/work' }, /Linux workspace path/],
+  ];
+  for (const [option, message] of cases) {
+    const view = fixture({ remoteName: 'wsl', ...option });
+    await view.open();
+    assert.deepEqual(view.entries, []);
+    assert.match(view.errors[0], message);
+  }
+});
+
+test('WSL stops before dispatch when the peer is disconnected or the binding names another distro', async () => {
+  const errors = [
+    [() => { throw new Error('disconnected'); }, /Visor unavailable in WSL Ubuntu for/],
+    [() => ({ ...scope, workspace, wsl_distro: 'Debian' }), /different WSL distribution or workspace/],
+    [() => ({ ...scope, workspace: '/other', wsl_distro: 'Ubuntu' }), /different WSL distribution or workspace/],
+  ];
+  for (const [respond, message] of errors) {
+    const view = fixture({ remoteName: 'wsl', choice: 'Run declared task', respond });
+    await view.open();
+    assert.deepEqual(view.entries.map(op => op.type), ['context']);
+    assert.match(view.errors[0], message);
   }
 });
 

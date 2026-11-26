@@ -22,7 +22,7 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
             raise SystemExit(f'Packaged runtime differs: {name}')
     package = json.loads(archive.read('extension/package.json'))
     source = json.loads((root / 'package.json').read_text())
-    for key in ('name', 'version', 'publisher', 'main', 'engines', 'contributes', 'activationEvents', 'capabilities'):
+    for key in ('name', 'version', 'publisher', 'main', 'engines', 'contributes', 'activationEvents', 'extensionKind', 'capabilities'):
         if package[key] != source[key]:
             raise SystemExit(f'Packaged manifest differs: {key}')
     if package.get('dependencies'):

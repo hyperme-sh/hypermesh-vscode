@@ -182,3 +182,14 @@ in user settings, open the saved file, and run
 Open **Problems** to see findings and jump to their locations. The status bar
 shows the plugin version, runtime, and configuration after the run. Rerun after
 saving edits or changing the selected file.
+
+### Visor terminal tasks in WSL
+
+Open the project in a VS Code WSL window and install Hypermesh in its WSL
+extension host. Set `hypermesh.companionExecutable` in **Remote Settings**
+to the companion's absolute Linux executable path in that distribution. Open
+**Hypermesh: Visor terminal task** in a trusted workspace to see the
+distribution, workspace and access before running or attaching.
+
+Setup, CLI commands, and the distribution binding are described in the
+[Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md#wsl).
