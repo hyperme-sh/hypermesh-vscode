@@ -135,15 +135,6 @@ function inputAttachment(grant, send, current, update, notice) {
       draining = false;
     }
   }
-  function enqueue(action, bytes) {
-    if (!lease || !current()) return;
-    if (queue.length >= 4) {
-      notice('Terminal input queue is full.');
-      return;
-    }
-    queue.push({ action, bytes });
-    void drain();
-  }
   return {
     input(data) {
       if (!lease || !current()) return;
@@ -152,7 +143,13 @@ function inputAttachment(grant, send, current, update, notice) {
         notice('Send at most 1024 bytes of terminal input at a time.');
         return;
       }
-      if (bytes.length) enqueue({ type: 'input', data_base64: bytes.toString('base64') }, bytes.length);
+      if (!bytes.length) return;
+      if (queue.length >= 4) {
+        notice('Terminal input queue is full.');
+        return;
+      }
+      queue.push({ action: { type: 'input', data_base64: bytes.toString('base64') }, bytes: bytes.length });
+      void drain();
     },
     resize(size) {
       if (!lease || !current()) return;
@@ -160,8 +157,15 @@ function inputAttachment(grant, send, current, update, notice) {
       const cols = size?.columns;
       if (![rows, cols].every(value => Number.isInteger(value) && value >= 1 && value <= 1000) ||
           dimensions === `${rows}:${cols}`) return;
-      if (queue.length < 4) dimensions = `${rows}:${cols}`;
-      enqueue({ type: 'resize', rows, cols });
+      dimensions = `${rows}:${cols}`;
+      const next = { action: { type: 'resize', rows, cols } };
+      // Keep one slot for the latest resize after any queued keystrokes.
+      if (queue.at(-1)?.action.type === 'resize') {
+        queue[queue.length - 1] = next;
+      } else {
+        queue.push(next);
+      }
+      void drain();
     },
     observe(terminal) {
       if (lease && (terminal?.id !== grant.terminal || !terminal.input_available || terminal.owner?.id !== grant.owner)) {
@@ -170,7 +174,6 @@ function inputAttachment(grant, send, current, update, notice) {
       }
     },
     close() { drop(true); },
-    stop() { drop(false); },
   };
 }
 
@@ -214,7 +217,7 @@ function attach(vscode, project, scope, id, cursor, request, current, grant) {
         if (result.truncated) writes.fire('\r\n[Visor] Output reached its limit.\r\n');
       }
     } catch {
-      input?.stop();
+      input?.close();
       if (!closed) writes.fire(`\r\n[Visor] Detached from task ${id} at cursor ${cursor}. Reattach to resume output.\r\n`);
     }
   }

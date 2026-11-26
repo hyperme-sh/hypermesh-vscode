@@ -127,6 +127,24 @@ test('Interactive resize and keystrokes share an explicit ordered grant', async 
   assert.deepEqual(operations[2], { type: 'release', lease });
 });
 
+test('The latest resize is delivered after a full queue of keystrokes', async () => {
+  const operations = [];
+  let finishFirst;
+  const input = inputAttachment(grant, async operation => {
+    operations.push(operation);
+    if (operation.sequence === 1) await new Promise(resolve => { finishFirst = resolve; });
+    const resized = operation.type === 'resize';
+    return { ack: { sequence: operation.sequence, resized, accepted_bytes: resized ? null : 1 } };
+  }, () => true, () => {}, assert.fail);
+  input.resize({ rows: 24, columns: 80 });
+  for (const key of 'abcd') input.input(key);
+  for (let columns = 81; columns <= 85; columns++) input.resize({ rows: 25, columns });
+  finishFirst();
+  await flush();
+  assert.deepEqual(operations.map(operation => operation.type), ['resize', 'input', 'input', 'input', 'input', 'resize']);
+  assert.deepEqual(operations[5], { type: 'resize', rows: 25, cols: 85, sequence: 6, lease });
+});
+
 test('Takeover discards queued input and the old reply cannot re-enable it', async () => {
   const operations = [];
   const messages = [];
@@ -206,4 +224,29 @@ test('Explicit confirmation transfers input for the exact attached terminal', as
   assert.deepEqual(client.entries.filter(operation => operation.type === 'control').map(operation => operation.request.type),
     ['claim', 'input', 'release']);
   assert.equal(client.entries.filter(operation => operation.type === 'read')[1].cursor, 12);
+});
+
+test('A failed output poll releases input ownership before the terminal closes', async () => {
+  let reads = 0;
+  const respond = operation => {
+    if (operation.type === 'read') {
+      if (++reads > 1) throw new Error('disconnected');
+      return interactivePage(operation, null);
+    }
+    const request = operation.request;
+    if (request.type === 'claim') {
+      return { lease, terminal: { id: terminal, input_available: true,
+        owner: { id: request.owner, client: 'editor', ack: null } } };
+    }
+    assert.deepEqual(request, { type: 'release', lease });
+    return {};
+  };
+  const client = fixture({ choice: 'Attach with input', input: id, respond });
+  await client.open();
+  await flush();
+  client.close();
+  await flush();
+  assert.deepEqual(client.entries.filter(operation => operation.type === 'control').map(operation => operation.request.type),
+    ['claim', 'release']);
+  assert.match(client.output.join(''), /Detached from task/);
 });
