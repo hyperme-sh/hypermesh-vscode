@@ -37,6 +37,10 @@
       {
         "command": "hypermesh.continue",
         "title": "Hypermesh: Continue task controls"
+      },
+      {
+        "command": "hypermesh.terminalTask",
+        "title": "Hypermesh: Visor terminal task"
       }
     ],
     "configuration": {
@@ -88,5 +92,11 @@
   "devDependencies": {
     "@vscode/vsce": "4.1.0"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Visor terminal tasks require a trusted local workspace."
+    }
+  }
 }

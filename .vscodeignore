@@ -10,3 +10,5 @@
 !src/permissions.js
 
 !src/continue.js
+
+!src/terminal-task.js

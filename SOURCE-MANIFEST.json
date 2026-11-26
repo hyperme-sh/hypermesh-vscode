@@ -53,6 +53,8 @@
     "src/permissions.js",
     "src/permissions.test.js",
     "src/continue.js",
-    "src/continue.test.js"
+    "src/continue.test.js",
+    "src/terminal-task.js",
+    "src/terminal-task.test.js"
   ]
 }
