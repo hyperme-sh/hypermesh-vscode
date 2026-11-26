@@ -206,3 +206,14 @@ and output cursor.
 
 The [Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md#remote-ssh)
 shows the matching CLI command and the host-side setup.
+
+### Workspace preview
+
+In a trusted local or Remote–SSH workspace, choose **Open workspace preview**
+from **Hypermesh: Visor terminal task**. Enter the running task's ID and review
+the enrolled device, workspace, and declared development port. VS Code opens
+the authorized link in its integrated browser. Remote–SSH forwards the Visor
+proxy on loopback. The preview ID shown in VS Code matches the CLI status.
+
+Choose **Close workspace preview** to revoke browser access. Visor also ends
+the preview when the task stops, access changes, or the short grant expires.

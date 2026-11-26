@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
 const { userSetting } = require('./editor');
+const { showPreview } = require('./workspace-preview');
 
 const idPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
@@ -328,6 +329,11 @@ function install(vscode, context, call = exchange, runtime = {
       if (!current()) throw unavailable();
       const choices = ['Attach to task', 'Attach with input', 'Cancel task', 'Workspace permissions'];
       if (scope.access === 'ready' && scope.task) choices.unshift('Run declared task');
+      const previewPort = scope.task?.preview_port;
+      if (scope.access === 'ready' && (!remote || remote === 'ssh-remote') &&
+          Number.isInteger(previewPort) && previewPort > 0 && previewPort <= 65535) {
+        choices.push('Open workspace preview', 'Close workspace preview');
+      }
       const choice = await vscode.window.showQuickPick(choices, {
         title: location ? `Visor terminal · ${location} · ${workspace} · access ${scope.access}` :
           `Visor terminal · connected · access ${scope.access}`,
@@ -355,6 +361,15 @@ function install(vscode, context, call = exchange, runtime = {
         pageFor(value, scope, starting, 0);
         if (!current()) throw unavailable();
         attach(vscode, scope, starting, 0, request, current);
+        return;
+      }
+      if (choice === 'Open workspace preview' || choice === 'Close workspace preview') {
+        const id = (await vscode.window.showInputBox({ prompt: 'Preview task ID' }))?.trim();
+        if (!id) return;
+        if (!idPattern.test(id)) throw new Error('Enter a valid task ID.');
+        await showPreview(vscode, {
+          choice, workspace, remote, scope, id, port: previewPort, request, current,
+        });
         return;
       }
       const input = await vscode.window.showInputBox({

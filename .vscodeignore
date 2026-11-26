@@ -13,3 +13,4 @@
 
 !src/terminal-task.js
 !src/workspace-lint.js
+!src/workspace-preview.js
