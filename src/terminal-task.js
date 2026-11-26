@@ -10,7 +10,7 @@ const accessStates = ['ready', 'paused'];
 const runStates = ['running', 'completed', 'failed', 'cancelled', 'timed_out', 'paused', 'revoked'];
 const unavailable = () => new Error('Visor terminal task unavailable or access changed.');
 
-function exchange(program, workspace, operation, spawnProcess = spawn) {
+function exchange(program, workspace, operation, device, spawnProcess = spawn) {
   if (![program, workspace].every(value => typeof value === 'string' && path.isAbsolute(value) && !/[\r\n\0]/.test(value))) {
     return Promise.reject(unavailable());
   }
@@ -19,7 +19,10 @@ function exchange(program, workspace, operation, spawnProcess = spawn) {
     if (process.env[key]) env[key] = process.env[key];
   }
   return new Promise((resolve, reject) => {
-    const child = spawnProcess(program, ['--terminal-task', workspace, 'request'], {
+    const args = ['--terminal-task', workspace];
+    if (device) args.push('--host', device);
+    args.push('request');
+    const child = spawnProcess(program, args, {
       shell: false, windowsHide: true, env, stdio: ['pipe', 'pipe', 'ignore'],
     });
     let output = Buffer.alloc(0);
@@ -177,13 +180,13 @@ function inputAttachment(grant, send, current, update, notice) {
   };
 }
 
-function attach(vscode, project, scope, id, cursor, request, current, grant) {
+function attach(vscode, scope, id, cursor, request, current, grant) {
   const writes = new vscode.EventEmitter();
   const names = new vscode.EventEmitter();
   const label = `Visor task ${id.slice(0, 8)}`;
   const notice = message => writes.fire(`\r\n[Visor] ${message}\r\n`);
   const input = grant && inputAttachment(grant,
-    operation => request(project, control(scope, id, grant.terminal, operation)),
+    operation => request(control(scope, id, grant.terminal, operation)),
     current, ack => names.fire(`${label} · input here · ack ${ack}`), notice);
   const decoder = new StringDecoder('utf8');
   let closed = false;
@@ -192,7 +195,7 @@ function attach(vscode, project, scope, id, cursor, request, current, grant) {
   async function poll() {
     try {
       if (!current()) throw unavailable();
-      const result = pageFor(await request(project, { ...scopeFor(scope, 'read', id), cursor }), scope, id, cursor);
+      const result = pageFor(await request({ ...scopeFor(scope, 'read', id), cursor }), scope, id, cursor);
       if (closed) return;
       if (!current()) throw unavailable();
       const tty = terminalFor(result.terminal);
@@ -249,11 +252,6 @@ function install(vscode, context, call = exchange, runtime = {
   platform: process.platform, distro: process.env.WSL_DISTRO_NAME,
 }) {
   function activeDistro() {
-    if (vscode.env.remoteName !== 'wsl') return undefined;
-    if (runtime.platform !== 'linux' || !vscode.ExtensionKind ||
-        context.extension?.extensionKind !== vscode.ExtensionKind.Workspace) {
-      throw new Error('Run the Hypermesh extension in the active WSL workspace host.');
-    }
     const name = runtime.distro;
     if (typeof name !== 'string' || name.length === 0 || Buffer.byteLength(name) > 1024 ||
         name.trim() !== name || /[\/\\\p{Cc}]/u.test(name)) {
@@ -266,51 +264,77 @@ function install(vscode, context, call = exchange, runtime = {
       !/[\\\p{Cc}]/u.test(value);
   }
   function project() {
-    if (!vscode.workspace.isTrusted || (vscode.env.remoteName && vscode.env.remoteName !== 'wsl')) return undefined;
-    const distro = activeDistro();
+    const remote = vscode.env.remoteName;
+    if (!vscode.workspace.isTrusted || (remote && !['wsl', 'ssh-remote'].includes(remote))) return undefined;
+    if (remote && (runtime.platform !== 'linux' || !vscode.ExtensionKind ||
+        context.extension?.extensionKind !== vscode.ExtensionKind.Workspace)) {
+      const location = remote === 'wsl' ? 'WSL' : 'Remote SSH';
+      throw new Error(`Run the Hypermesh extension in the active ${location} workspace host.`);
+    }
     const active = vscode.window.activeTextEditor?.document?.uri;
     const folder = (active && vscode.workspace.getWorkspaceFolder(active)) ??
       (vscode.workspace.workspaceFolders?.length === 1 ? vscode.workspace.workspaceFolders[0] : undefined);
     if (folder?.uri.scheme !== 'file') return undefined;
     const workspace = folder.uri.fsPath;
-    if (distro && (folder.uri.authority || !linuxPath(workspace))) {
-      throw new Error('Use the Linux workspace path inside the active WSL distribution.');
+    if (remote && (folder.uri.authority || !linuxPath(workspace))) {
+      throw new Error('Use the Linux workspace path inside the active remote workspace host.');
     }
-    return workspace;
-  }
-  function request(workspace, operation) {
-    if (project() !== workspace) throw unavailable();
-    const executable = userSetting(vscode.workspace.getConfiguration('hypermesh'), 'companionExecutable');
-    const distro = activeDistro();
-    const pending = call(executable, workspace, operation);
-    if (!distro) return pending;
-    return pending.catch(() => {
-      throw new Error(`Visor unavailable in WSL ${distro} for ${workspace}. Check the companion in that distribution.`);
-    });
+    const distro = remote === 'wsl' ? activeDistro() : undefined;
+    let device;
+    if (remote === 'ssh-remote') {
+      const configured = userSetting(vscode.workspace.getConfiguration('hypermesh'), 'terminalHostDeviceId');
+      device = typeof configured === 'string' ? configured.toLowerCase() : '';
+      if (!idPattern.test(device) || device === '00000000-0000-0000-0000-000000000000') {
+        throw new Error('Set the enrolled Visor device ID in Hypermesh Remote Settings.');
+      }
+    }
+    return { workspace, distro, device, remote };
   }
   context.subscriptions.push(vscode.commands.registerCommand('hypermesh.terminalTask', async () => {
     let starting;
     try {
-      const workspace = project();
-      if (!workspace) {
-        const location = vscode.env.remoteName === 'wsl' ? 'WSL' : 'local';
+      const target = project();
+      if (!target) {
+        const location = vscode.env.remoteName === 'wsl' ? 'WSL' :
+          vscode.env.remoteName === 'ssh-remote' ? 'Remote SSH' : 'local';
         throw new Error(`Open a trusted ${location} workspace to use Visor terminal tasks.`);
       }
-      const distro = activeDistro();
-      const scope = contextFor(await request(workspace, { type: 'context' }));
+      const { workspace, distro, device, remote } = target;
+      const current = () => {
+        try {
+          const active = project();
+          return active?.workspace === workspace && active.distro === distro &&
+            active.device === device && active.remote === remote;
+        } catch {
+          return false;
+        }
+      };
+      const location = distro ? `WSL ${distro}` : device ? `SSH device ${device}` : undefined;
+      const request = operation => {
+        if (!current()) throw unavailable();
+        const executable = userSetting(vscode.workspace.getConfiguration('hypermesh'), 'companionExecutable');
+        const pending = call(executable, workspace, operation, device);
+        return location ? pending.catch(() => {
+          throw new Error(`Visor unavailable ${distro ? 'in' : 'on'} ${location} for ${workspace}. Check the companion and selected session on that host.`);
+        }) : pending;
+      };
+      const scope = contextFor(await request({ type: 'context' }));
       if (distro && (scope.wsl_distro !== distro || scope.workspace !== workspace)) {
         throw new Error('Visor reported a different WSL distribution or workspace.');
       }
-      if (project() !== workspace) throw unavailable();
+      if (device && (scope.device_id !== device || scope.workspace !== workspace)) {
+        throw new Error('Visor reported a different enrolled device or workspace.');
+      }
+      if (!current()) throw unavailable();
       const choices = ['Attach to task', 'Attach with input', 'Cancel task', 'Workspace permissions'];
       if (scope.access === 'ready' && scope.task) choices.unshift('Run declared task');
       const choice = await vscode.window.showQuickPick(choices, {
-        title: distro ? `Visor terminal · WSL ${distro} · ${workspace} · access ${scope.access}` :
+        title: location ? `Visor terminal · ${location} · ${workspace} · access ${scope.access}` :
           `Visor terminal · connected · access ${scope.access}`,
         placeHolder: scope.task ? scope.task.command : 'No terminal task declared',
       });
       if (!choice) return;
-      if (project() !== workspace) throw unavailable();
+      if (!current()) throw unavailable();
       if (choice === 'Workspace permissions') {
         await vscode.commands.executeCommand('hypermesh.permissions');
         return;
@@ -321,16 +345,16 @@ function install(vscode, context, call = exchange, runtime = {
             typeof task.cwd !== 'string' || !Array.isArray(task.args) || task.environment !== 'clean') throw unavailable();
         const answer = await vscode.window.showWarningMessage('Run the declared Visor terminal task?', {
           modal: true,
-          detail: `${distro ? `WSL distribution: ${distro}\n` : ''}Workspace: ${workspace}\nDirectory: ${task.cwd}\nCommand: ${JSON.stringify([task.command, ...task.args])}\nEnvironment: clean\nMode: ${task.interactive ? 'interactive' : 'view only'}\nTimeout: ${task.timeout_seconds}s`,
+          detail: `${location ? `${location}\n` : ''}Workspace: ${workspace}\nDirectory: ${task.cwd}\nCommand: ${JSON.stringify([task.command, ...task.args])}\nEnvironment: clean\nMode: ${task.interactive ? 'interactive' : 'view only'}\nTimeout: ${task.timeout_seconds}s`,
         }, 'Run Task');
         if (answer !== 'Run Task') return;
         starting = randomUUID();
-        const value = await request(workspace, {
+        const value = await request({
           ...scopeFor(scope, 'start', starting), revision: task.revision,
         });
         pageFor(value, scope, starting, 0);
-        if (project() !== workspace) throw unavailable();
-        attach(vscode, workspace, scope, starting, 0, request, () => project() === workspace);
+        if (!current()) throw unavailable();
+        attach(vscode, scope, starting, 0, request, current);
         return;
       }
       const input = await vscode.window.showInputBox({
@@ -343,31 +367,31 @@ function install(vscode, context, call = exchange, runtime = {
           (offset !== undefined && (choice === 'Cancel task' || !/^\d+$/.test(offset)))) {
         throw new Error('Enter a valid task ID and output cursor.');
       }
-      if (project() !== workspace) throw unavailable();
+      if (!current()) throw unavailable();
       if (choice === 'Attach with input') {
         const read = { ...scopeFor(scope, 'read', id), cursor };
-        const page = pageFor(await request(workspace, read), scope, id, cursor);
+        const page = pageFor(await request(read), scope, id, cursor);
         const tty = terminalFor(page.terminal);
         if (!tty?.input_available || page.status !== 'running') throw new Error('Interactive input is unavailable for this task.');
-        if (project() !== workspace) throw unavailable();
+        if (!current()) throw unavailable();
         const transfer = tty.owner ? `Transfer input from ${tty.owner.client} to this VS Code terminal?` :
           'Enable input for this Visor task?';
         const answer = await vscode.window.showWarningMessage(transfer, { modal: true, detail: `Task ${id}` }, 'Enable Input');
         if (answer !== 'Enable Input') return;
         const owner = randomUUID();
-        const result = await request(workspace, control(scope, id, tty.id, {
+        const result = await request(control(scope, id, tty.id, {
           type: 'claim', owner, client: 'editor', expected_owner: tty.owner?.id ?? null,
         }));
-        if (project() !== workspace || !idPattern.test(result?.lease) ||
+        if (!current() || !idPattern.test(result?.lease) ||
             terminalFor(result.terminal)?.owner?.id !== owner) throw unavailable();
-        attach(vscode, workspace, scope, id, cursor, request, () => project() === workspace, {
+        attach(vscode, scope, id, cursor, request, current, {
           terminal: tty.id, owner, lease: result.lease,
         });
       } else if (choice === 'Attach to task') {
-        attach(vscode, workspace, scope, id, cursor, request, () => project() === workspace);
+        attach(vscode, scope, id, cursor, request, current);
       } else {
-        const result = pageFor(await request(workspace, scopeFor(scope, 'cancel', id)), scope, id, 0);
-        if (project() !== workspace) throw unavailable();
+        const result = pageFor(await request(scopeFor(scope, 'cancel', id)), scope, id, 0);
+        if (!current()) throw unavailable();
         vscode.window.showInformationMessage(result.status === 'running' ?
           `Cancellation requested for task ${id}.` : `Task ${id} is ${result.status}.`);
       }

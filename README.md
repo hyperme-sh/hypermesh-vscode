@@ -193,3 +193,16 @@ distribution, workspace and access before running or attaching.
 
 Setup, CLI commands, and the distribution binding are described in the
 [Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md#wsl).
+
+### Visor terminal tasks over Remote SSH
+
+Open the trusted Linux workspace through VS Code Remote–SSH. Install
+Hypermesh in the remote extension host. In **Remote Settings**, set
+`hypermesh.companionExecutable` to the companion on that host and
+`hypermesh.terminalHostDeviceId` to the enrolled device UUID. The terminal
+picker shows that device, the remote workspace and access state. If a
+connection drops, reopen the command and attach using the displayed task ID
+and output cursor.
+
+The [Visor terminal task guide](https://github.com/hyperme-sh/visor/blob/main/docs/terminal-tasks.md#remote-ssh)
+shows the matching CLI command and the host-side setup.

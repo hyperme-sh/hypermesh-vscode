@@ -75,6 +75,12 @@
           "description": "Private Visor companion socket path. User settings only. No API key is sent.",
           "scope": "machine"
         },
+        "hypermesh.terminalHostDeviceId": {
+          "type": "string",
+          "default": "",
+          "description": "Expected enrolled Visor device UUID for terminal tasks in a Remote SSH workspace. Set in Remote Settings.",
+          "scope": "machine"
+        },
         "hypermesh.companionExecutable": {
           "type": "string",
           "default": "",
@@ -101,7 +107,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Visor terminal tasks require a trusted local or WSL workspace. Workspace lint requires a trusted local workspace."
+      "description": "Visor terminal tasks require a trusted local, WSL, or Remote SSH workspace. Workspace lint requires a trusted local workspace."
     }
   }
 }

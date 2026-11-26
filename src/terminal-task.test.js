@@ -8,18 +8,21 @@ const id = 'c1234567-1234-1234-1234-123456789abc';
 const binding = 'a'.repeat(64);
 const revision = 'b'.repeat(64);
 const workspace = '/fixture/workspace';
+const device = 'd1234567-1234-1234-1234-123456789abc';
+const foreignDevice = 'e1234567-1234-1234-1234-123456789abc';
 const scope = { boot, session, binding, access: 'ready', task: {
   revision, cwd: workspace + '/src', command: '/bin/pwd', args: [], environment: 'clean', timeout_seconds: 5,
 } };
 
 function fixture({
   trusted = true, remoteName, choice, input, onConfirm, respond, project = workspace,
-  placement = 2, runtime = { platform: 'linux', distro: 'Ubuntu' },
+  placement = 2, runtime = { platform: 'linux', distro: 'Ubuntu' }, terminalDevice = device,
 } = {}) {
   const entries = [];
   const output = [];
   const errors = [];
   const confirmations = [];
+  const devices = [];
   const menus = [];
   let command;
   let pty;
@@ -29,7 +32,8 @@ function fixture({
     workspace: {
       isTrusted: trusted,
       workspaceFolders: [{ uri: { scheme: 'file', fsPath: project } }],
-      getConfiguration: () => ({ inspect: () => ({ globalValue: '/installed/companion' }) }),
+      getConfiguration: () => ({ inspect: name => name === 'terminalHostDeviceId' ?
+        { globalValue: terminalDevice, workspaceValue: foreignDevice } : { globalValue: '/installed/companion' } }),
     },
     commands: { registerCommand: (_, handler) => { command = handler; } },
     EventEmitter: class {
@@ -56,10 +60,13 @@ function fixture({
       createTerminal: ({ pty: value }) => { pty = value; return { show: () => pty.open() }; },
     },
   };
-  install(vscode, { subscriptions: [], extension: { extensionKind: placement } }, async (exe, path, operation) => {
+  install(vscode, { subscriptions: [], extension: { extensionKind: placement } }, async (exe, path, operation, expectedDevice) => {
     assert.equal(exe, '/installed/companion');
     assert.equal(path, project);
     entries.push(operation);
+    devices.push(expectedDevice);
+    if (operation.type === 'context' && remoteName === 'ssh-remote') return respond?.(operation) ??
+      { ...scope, workspace: project, device_id: device };
     if (operation.type === 'context') return remoteName === 'wsl' ?
       respond?.(operation) ?? { ...scope, workspace: project, wsl_distro: runtime.distro } : scope;
     const override = respond?.(operation);
@@ -69,11 +76,11 @@ function fixture({
       access: 'ready', cursor: (operation.cursor || 0) + Buffer.byteLength(outputText), more: false,
       truncated: false, output_base64: Buffer.from(outputText).toString('base64') };
   }, runtime);
-  return { entries, output, errors, confirmations, menus, pty: () => pty, open: () => command(), close: () => pty?.close() };
+  return { entries, devices, output, errors, confirmations, menus, pty: () => pty, open: () => command(), close: () => pty?.close() };
 }
 
 test('Restricted Mode and remote workspaces refuse before starting a helper', async () => {
-  for (const options of [{ trusted: false }, { remoteName: 'ssh-remote' }]) {
+  for (const options of [{ trusted: false }, { remoteName: 'dev-container' }]) {
     const client = fixture(options);
     await client.open();
     assert.deepEqual(client.entries, []);
@@ -119,6 +126,56 @@ test('WSL stops before dispatch when the peer is disconnected or the binding nam
     assert.deepEqual(view.entries.map(op => op.type), ['context']);
     assert.match(view.errors[0], message);
   }
+});
+
+test('Remote SSH uses the configured enrolled device for context, run, and output', async () => {
+  const client = fixture({ remoteName: 'ssh-remote', choice: 'Run declared task' });
+  await client.open();
+  assert.deepEqual(client.entries.map(op => op.type), ['context', 'start', 'read']);
+  assert.deepEqual(client.devices, [device, device, device]);
+  assert.ok(client.menus[0].includes(`SSH device ${device} · ${workspace} · access ready`));
+  assert.deepEqual(client.errors, []);
+  client.close();
+});
+
+test('Remote SSH verifies workspace trust, extension placement, and enrollment before attaching', async () => {
+  const cases = [
+    [{ trusted: false }, [], /trusted Remote SSH workspace/],
+    [{ placement: 1 }, [], /Remote SSH workspace host/],
+    [{ terminalDevice: '' }, [], /enrolled Visor device ID/],
+    [{ project: 'C:/work' }, [], /Linux workspace path/],
+    [{ respond: () => ({ ...scope, device_id: foreignDevice, workspace }) }, ['context'], /different enrolled device or workspace/],
+    [{ respond: () => ({ ...scope, device_id: device, workspace: '/other' }) }, ['context'], /different enrolled device or workspace/],
+  ];
+  for (const [option, operations, message] of cases) {
+    const client = fixture({ remoteName: 'ssh-remote', choice: 'Attach to task', input: id, ...option });
+    await client.open();
+    assert.deepEqual(client.entries.map(op => op.type), operations);
+    assert.match(client.errors[0], message);
+  }
+});
+
+test('Remote SSH reattaches at the reported cursor after a disconnect without restarting the task', async () => {
+  let fail = true;
+  const client = fixture({
+    remoteName: 'ssh-remote', choice: 'Attach to task', input: id + ' 15',
+    respond(operation) {
+      if (operation.type === 'read' && fail) throw new Error('disconnected');
+      return undefined;
+    },
+  });
+  await client.open();
+  await new Promise(setImmediate);
+  assert.match(client.output.join(''), /Detached from task .* at cursor 15/);
+  client.close();
+  fail = false;
+  await client.open();
+  await new Promise(setImmediate);
+  assert.deepEqual(client.entries.map(op => op.type), ['context', 'read', 'context', 'read']);
+  assert.deepEqual(client.devices, [device, device, device, device]);
+  assert.deepEqual(client.entries[1], client.entries[3]);
+  assert.match(client.output.join(''), /done.*completed/s);
+  client.close();
 });
 
 test('Workspace Trust is checked again after command review', async () => {
