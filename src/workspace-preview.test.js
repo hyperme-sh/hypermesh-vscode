@@ -9,7 +9,7 @@ const route = '/0123456789abcdef0123456789abcdef/';
 const open = { ...scope, id, state: 'open', port: 4173, preview_id: id, url: 'http://127.0.0.1:50123' + route };
 
 function setup({ remote, mapped = 'http://localhost:51000/', commands = [browser], choice = 'Open workspace preview',
-  current = () => true, grant = open } = {}) {
+  current = () => true, grant = open, localPortHost = 'localhost' } = {}) {
   const operations = [];
   const forwards = [];
   const launches = [];
@@ -17,6 +17,7 @@ function setup({ remote, mapped = 'http://localhost:51000/', commands = [browser
     commands: { getCommands: async () => commands, executeCommand: async (...args) => launches.push(args) },
     env: { asExternalUri: async origin => { forwards.push(origin); return mapped; } },
     Uri: { parse: value => value },
+    workspace: { getConfiguration: () => ({ get: () => localPortHost }) },
     window: { showWarningMessage: async () => 'Open Preview', showInformationMessage() {} },
   };
   const run = () => showPreview(vscode, {
@@ -48,6 +49,10 @@ test('missing browser support or an external forwarding result blocks the previe
   const missing = setup({ commands: [] });
   await assert.rejects(missing.run, /integrated browser is unavailable/);
   assert.deepEqual(missing.operations, []);
+  const shared = setup({ remote: 'ssh-remote', localPortHost: 'allInterfaces' });
+  await assert.rejects(shared.run, /Private forwarding is unavailable/);
+  assert.deepEqual(shared.operations, []);
+  assert.deepEqual(shared.forwards, []);
   for (const mapped of ['https://remote.example/', 'http://localhost:4173/', 'http://localhost:51000/other']) {
     const view = setup({ remote: 'ssh-remote', mapped });
     await assert.rejects(view.run, /unavailable/);

@@ -33,8 +33,11 @@ async function showPreview(vscode, { choice, workspace, remote, scope, id, port,
   if (!(await vscode.commands.getCommands(true)).includes(integratedBrowser)) {
     throw new Error('The VS Code integrated browser is unavailable.');
   }
-  if (remote && (remote !== 'ssh-remote' || typeof vscode.env.asExternalUri !== 'function')) {
-    throw new Error('Private forwarding is unavailable for this workspace.');
+  const privateForwarding = () => remote === 'ssh-remote' &&
+    typeof vscode.env.asExternalUri === 'function' &&
+    vscode.workspace.getConfiguration('remote').get('localPortHost', 'localhost') === 'localhost';
+  if (remote && !privateForwarding()) {
+    throw new Error('Private forwarding is unavailable for this workspace. Use the localhost port binding.');
   }
   const answer = await vscode.window.showWarningMessage('Open the authorized Visor workspace preview?', {
     modal: true, detail: `Device ${scope.device_id}\nWorkspace ${workspace}\nDevelopment port ${port}`,
@@ -48,6 +51,7 @@ async function showPreview(vscode, { choice, workspace, remote, scope, id, port,
       !/^\/[a-f0-9]{32}\/$/.test(source.pathname)) throw unavailable();
   let origin = source.origin;
   if (remote) {
+    if (!privateForwarding()) throw unavailable();
     const mapped = await vscode.env.asExternalUri(vscode.Uri.parse(origin));
     const forwarded = loopback(mapped.toString());
     if (forwarded.pathname !== '/' || Number(forwarded.port) === port) throw unavailable();
