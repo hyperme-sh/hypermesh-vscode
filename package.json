@@ -41,6 +41,10 @@
       {
         "command": "hypermesh.terminalTask",
         "title": "Hypermesh: Visor terminal task"
+      },
+      {
+        "command": "hypermesh.lintFile",
+        "title": "Hypermesh: Lint current JSON file with Visor"
       }
     ],
     "configuration": {
@@ -96,7 +100,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Visor terminal tasks require a trusted local workspace."
+      "description": "Visor terminal tasks and workspace lint require a trusted local workspace."
     }
   }
 }

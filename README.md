@@ -170,3 +170,15 @@ to claim the exact task terminal. Confirm a transfer if another client owns
 input. The terminal tab shows the current owner and last acknowledgement.
 Keystrokes and resize events go to that task. **Attach to task** follows output
 as a viewer, and closing either view detaches.
+
+### Lint a workspace JSON file
+
+On Linux, open a trusted local workspace with an approved Visor session.
+Follow the [Visor JSON lint setup](https://github.com/hyperme-sh/visor/blob/main/plugins/json-lint/README.md)
+to approve the exact file and enable the plugin. Set `hypermesh.companionExecutable`
+in user settings, open the saved file, and run
+**Hypermesh: Lint current JSON file with Visor**.
+
+Open **Problems** to see findings and jump to their locations. The status bar
+shows the plugin version, runtime, and configuration after the run. Rerun after
+saving edits or changing the selected file.
