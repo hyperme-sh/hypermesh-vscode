@@ -56,6 +56,8 @@
     "src/continue.test.js",
     "src/terminal-task.js",
     "src/workspace-preview.js",
+    "src/cloud-workspace.js",
+    "src/cloud-workspace.test.js",
     "src/workspace-preview.test.js",
     "src/terminal-task.test.js",
     "src/workspace-lint.js",

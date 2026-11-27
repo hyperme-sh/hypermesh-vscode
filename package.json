@@ -44,6 +44,10 @@
         "title": "Hypermesh: Visor terminal task"
       },
       {
+        "command": "hypermesh.cloudWorkspace",
+        "title": "Hypermesh: Cloud workspace task"
+      },
+      {
         "command": "hypermesh.lintFile",
         "title": "Hypermesh: Lint current JSON file with Visor"
       }
@@ -80,6 +84,19 @@
           "default": "",
           "description": "Expected enrolled Visor device UUID for terminal tasks in a Remote SSH workspace. Set in Remote Settings.",
           "scope": "machine"
+        },
+        "hypermesh.cloudWorkspaceTask": {
+          "type": "object",
+          "default": {},
+          "description": "Selected cloud workspace task on the enrolled Linux worker. Set in User or Remote Settings.",
+          "scope": "machine",
+          "properties": {
+            "executable": { "type": "string", "description": "Absolute installed headless Visor executable path." },
+            "device_id": { "type": "string" },
+            "worker_generation": { "type": "integer", "minimum": 1 },
+            "task_id": { "type": "string" },
+            "lease_id": { "type": "string" }
+          }
         },
         "hypermesh.companionExecutable": {
           "type": "string",
