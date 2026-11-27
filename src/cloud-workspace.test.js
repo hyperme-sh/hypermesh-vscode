@@ -17,12 +17,14 @@ test('the editor rejects an expired lease, a foreign agent, or a regressed outpu
   }
 });
 
-test('the enrolled worker selection and output remain scoped across inspect and invoke', async () => {
+const extensionKinds = { UI: 1, Workspace: 2 };
+
+async function runCloudCommand(remoteName, extensionKind) {
   const ops = [], lines = [], errors = [];
   let command;
   const settings = { executable: '/usr/bin/hypermesh-visor-headless', ...scope };
   const vscode = {
-    env: { remoteName: 'ssh-remote' }, ExtensionKind: { Workspace: 2 },
+    env: { remoteName }, ExtensionKind: extensionKinds,
     workspace: {
       isTrusted: true, workspaceFolders: [{ uri: { scheme: 'file', fsPath: scope.workspace } }],
       getConfiguration: () => ({ inspect: () => ({ globalValue: settings, workspaceValue: { device_id: three } }) }),
@@ -40,14 +42,30 @@ test('the enrolled worker selection and output remain scoped across inspect and 
       showErrorMessage: text => errors.push(text),
     },
   };
-  install(vscode, { extension: { extensionKind: 2 }, subscriptions: [] }, async (exe, supplied, request) => {
+  install(vscode, { extension: { extensionKind }, subscriptions: [] }, async (exe, supplied, request) => {
     assert.equal(exe, settings.executable);
     assert.deepEqual(supplied, scope);
     ops.push(request.operation);
     return request.operation === 'read' ? { ...view, state: 'completed', output: 'valid\n', cursor: 6 } : view;
   }, 'linux');
   await command();
-  assert.deepEqual(ops, ['inspect', 'invoke', 'read']);
-  assert.deepEqual(errors, []);
-  assert.ok(lines.includes('valid\n'));
+  return { ops, lines, errors };
+}
+
+for (const [host, remoteName, extensionKind] of [
+  ['local Linux', undefined, extensionKinds.UI],
+  ['Remote SSH', 'ssh-remote', extensionKinds.Workspace],
+]) {
+  test(`the enrolled worker stays scoped across inspect and invoke on ${host}`, async () => {
+    const { ops, lines, errors } = await runCloudCommand(remoteName, extensionKind);
+    assert.deepEqual(ops, ['inspect', 'invoke', 'read']);
+    assert.deepEqual(errors, []);
+    assert.ok(lines.includes('valid\n'));
+  });
+}
+
+test('the local UI host cannot run the enrolled worker command in a Remote SSH window', async () => {
+  const { ops, errors } = await runCloudCommand('ssh-remote', extensionKinds.UI);
+  assert.deepEqual(ops, []);
+  assert.match(errors[0], /trusted Linux worker workspace/);
 });
