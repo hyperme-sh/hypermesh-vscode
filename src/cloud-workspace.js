@@ -10,8 +10,9 @@ const fail = () => new Error('Cloud workspace lease is unavailable or changed.')
 
 function selection(vscode, context) {
   const remote = vscode.env.remoteName;
-  if (!vscode.workspace.isTrusted || (remote && remote !== 'ssh-remote') ||
-      context.extension?.extensionKind !== vscode.ExtensionKind.Workspace) return undefined;
+  if (!vscode.workspace.isTrusted) return undefined;
+  if (remote && (remote !== 'ssh-remote' ||
+      context.extension?.extensionKind !== vscode.ExtensionKind.Workspace)) return undefined;
   const folders = vscode.workspace.workspaceFolders ?? [];
   const active = vscode.window.activeTextEditor?.document?.uri;
   const folder = (active && vscode.workspace.getWorkspaceFolder(active)) ??
